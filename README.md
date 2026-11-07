@@ -14,6 +14,7 @@ The Coen Lab's pre-training preflight: one Bonsai workflow for every rig, checki
 - `coen_qc_preflight_rig.judge` (Bonsai measures, Python computes) applies `config\thresholds.yml` and writes the pass record rig-control reads: `<RigConfigs>\<RIG>\preflight\last.json`. Every declared device must report, and nothing else may.
 
 ```
+scripts\deploy.ps1          # Bonsai and its packages into .bonsai\, as rig-setup does
 uv run coen-qc-preflight-rig plan <rig.yml>
 uv run coen-qc-preflight-rig judge <rig.yml> <raw.csv> <out.json> --rig <RIG> --commit <sha>
 .bonsai\Bonsai.exe src\main.bonsai --no-editor --property:ConfigRoot=<dir> --property:RawFile=<csv> [--property:ProjectionWindowState=Normal --property:ProjectionWidth=640 --property:ProjectionHeight=360]
@@ -24,5 +25,6 @@ uv run coen-qc-preflight-rig judge <rig.yml> <raw.csv> <out.json> --rig <RIG> --
 - The checks a person confirms at the end (speakers heard, projection seen), asked together after everything automatic.
 - The behaviour board starting its camera trigger, without which a triggered camera counts no frames.
 - `ExperimentControl`, so rig-control can launch it from a Preflight card on its Calibrations page.
-- Thresholds set on a rig; `local_packages` taken from lib-open-rigs' update-workflows.
+- Thresholds set on a rig.
+- rig-setup's Repos, which also puts it under lib-open-rigs' update-workflows; until then its `local_packages` are the lab's as of 7 Nov 2026.
 - `PreflightDevices` and `CheckDevice` moved into lib-open-rigs with tests, if the design holds on a rig.
