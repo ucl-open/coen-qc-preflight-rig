@@ -23,7 +23,7 @@ SINGLE_SECTIONS = ("speakerArray", "projectionCalibration")
 
 
 class CheckedRig(Rig):
-    """The parts of a rig.yml the rig check reads."""
+    """The parts of a rig.yml the preflight reads."""
 
     behavior_board: Dict[str, BehaviorBoard] = Field(default_factory=dict)
     timestamp_generator_gen3: Dict[str, HarpTimestampGeneratorGen3] = Field(default_factory=dict)

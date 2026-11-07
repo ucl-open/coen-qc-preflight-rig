@@ -1,16 +1,16 @@
-"""coen-rig-check plan <rig.yml> | judge <rig.yml> <raw.csv> <out.json> --rig NAME --commit SHA."""
+"""coen-qc-preflight-rig plan <rig.yml> | judge <rig.yml> <raw.csv> <out.json> --rig NAME --commit SHA."""
 
 import argparse
 import json
 from pathlib import Path
 
-from coen_rig_check import judge, plan, rig
+from coen_qc_preflight_rig import judge, plan, rig
 
 THRESHOLDS = Path(__file__).resolve().parents[2] / "config" / "thresholds.yml"
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(prog="coen-rig-check")
+    p = argparse.ArgumentParser(prog="coen-qc-preflight-rig")
     sub = p.add_subparsers(dest="cmd", required=True)
     sp = sub.add_parser("plan", help="list the devices a rig.yml's check covers")
     sp.add_argument("rig_yml", type=Path)

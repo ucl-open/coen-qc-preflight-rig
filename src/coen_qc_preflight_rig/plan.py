@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from coen_rig_check.rig import DEVICE_KINDS, SINGLE_SECTIONS, CheckedRig
+from coen_qc_preflight_rig.rig import DEVICE_KINDS, SINGLE_SECTIONS, CheckedRig
 
 # rig.yml key to CheckedRig attribute.
 _FIELDS = {

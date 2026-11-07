@@ -6,7 +6,7 @@ import pydantic
 import pytest
 import yaml
 
-from coen_rig_check import judge, plan, rig
+from coen_qc_preflight_rig import judge, plan, rig
 
 FIXTURES = Path(__file__).parent / "fixtures"
 THRESHOLDS = Path(__file__).parents[1] / "config" / "thresholds.yml"

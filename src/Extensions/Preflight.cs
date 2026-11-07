@@ -9,12 +9,12 @@ using System.Reactive.Linq;
 using Bonsai;
 using YamlDotNet.RepresentationModel;
 
-// PROTOTYPE (7 Nov 2026): if the one-workflow design holds on a rig, RigCheckDevices belongs beside
+// PROTOTYPE (7 Nov 2026): if the one-workflow design holds on a rig, PreflightDevices belongs beside
 // lib-open-rigs' Shared\RigDevices.cs, whose rule it copies, and CheckDevice in a lab package, both
 // with tests. C# 5: no interpolation, no ?. and no property initialisers.
 
 /// <summary>One entry of rig.yml the check covers: a device (kind: instance: settings) or a single section.</summary>
-public class RigCheckDevice
+public class PreflightDevice
 {
     /// <summary>The rig.yml key, such as camera.</summary>
     public string Kind { get; set; }
@@ -33,7 +33,7 @@ public class RigCheckDevice
 }
 
 /// <summary>One raw measurement, a row of the check's CSV: Device,Measure,Value,Detail.</summary>
-public class RigCheckRow
+public class PreflightRow
 {
     /// <summary>The device's name.</summary>
     public string Device { get; set; }
@@ -49,7 +49,7 @@ public class RigCheckRow
 [Combinator]
 [WorkflowElementCategory(ElementCategory.Source)]
 [Description("The rig.yml entries of the kinds named, in file order; nothing when the rig declares none of them.")]
-public class RigCheckDevices
+public class PreflightDevices
 {
     string configRoot = @"C:\Coen-Lab-Local\RigConfigs";
 
@@ -62,21 +62,21 @@ public class RigCheckDevices
     public string Kinds { get; set; }
 
     /// <summary>Reads rig.yml when subscribed; a missing or unreadable rig.yml is an error: the check cannot run.</summary>
-    public IObservable<RigCheckDevice> Process()
+    public IObservable<PreflightDevice> Process()
     {
         return Observable.Defer(() => Read().ToObservable());
     }
 
-    List<RigCheckDevice> Read()
+    List<PreflightDevice> Read()
     {
         var path = Path.Combine(Environment.ExpandEnvironmentVariables(ConfigRoot), Environment.MachineName, "rig.yml");
-        if (!File.Exists(path)) throw new FileNotFoundException("The rig check needs a rig.yml, and there is none at " + path, path);
+        if (!File.Exists(path)) throw new FileNotFoundException("The preflight needs a rig.yml, and there is none at " + path, path);
         var yaml = new YamlStream();
         using (var reader = new StreamReader(path)) yaml.Load(reader);
         var root = yaml.Documents.Count > 0 ? yaml.Documents[0].RootNode as YamlMappingNode : null;
         if (root == null) throw new InvalidOperationException(path + " is empty or not a set of settings");
         var kinds = new HashSet<string>((Kinds ?? string.Empty).Split(',').Select(k => k.Trim()).Where(k => k.Length > 0));
-        var devices = new List<RigCheckDevice>();
+        var devices = new List<PreflightDevice>();
         foreach (var kind in root.Children)
         {
             var kindName = Scalar(kind.Key);
@@ -96,9 +96,9 @@ public class RigCheckDevices
         return devices;
     }
 
-    static RigCheckDevice Device(string kind, string instance, string name, YamlMappingNode settings)
+    static PreflightDevice Device(string kind, string instance, string name, YamlMappingNode settings)
     {
-        var device = new RigCheckDevice();
+        var device = new PreflightDevice();
         device.Kind = kind;
         device.Instance = instance;
         device.Name = name;
@@ -162,13 +162,13 @@ public class CheckDevice
     public double Seconds { get { return seconds; } set { seconds = value; } }
 
     /// <summary>The device's rows.</summary>
-    public IObservable<RigCheckRow> Process<TSource>(IObservable<TSource> source)
+    public IObservable<PreflightRow> Process<TSource>(IObservable<TSource> source)
     {
         // Read at subscription: a PropertyMapping sets Device after the workflow is built.
         return Observable.Defer(() => Measured(source, Device, Measure, Warmup, Seconds));
     }
 
-    static IObservable<RigCheckRow> Measured<TSource>(IObservable<TSource> source, string device, string what, double warmup, double seconds)
+    static IObservable<PreflightRow> Measured<TSource>(IObservable<TSource> source, string device, string what, double warmup, double seconds)
     {
         var start = TimeSpan.FromSeconds(warmup);
         var end = TimeSpan.FromSeconds(warmup + seconds);
@@ -185,14 +185,14 @@ public class CheckDevice
             .Where(elapsed => elapsed >= start)
             .Count()
             .SelectMany(n => new[] { Row(device, what, n.ToString(CultureInfo.InvariantCulture), string.Empty), Row(device, "seconds", window, string.Empty) })
-            .Catch<RigCheckRow, Exception>(error => Observable.Return(Row(device, "error", string.Empty, Clean(error))))
+            .Catch<PreflightRow, Exception>(error => Observable.Return(Row(device, "error", string.Empty, Clean(error))))
             // Each row on stderr as it is made: CsvWriter reaches disk only when the workflow ends.
-            .Do(row => Console.Error.WriteLine("rig check: " + row.Device + " " + row.Measure + " " + row.Value + " " + row.Detail));
+            .Do(row => Console.Error.WriteLine("preflight: " + row.Device + " " + row.Measure + " " + row.Value + " " + row.Detail));
     }
 
-    static RigCheckRow Row(string device, string measure, string value, string detail)
+    static PreflightRow Row(string device, string measure, string value, string detail)
     {
-        var row = new RigCheckRow();
+        var row = new PreflightRow();
         row.Device = device;
         row.Measure = measure;
         row.Value = value;

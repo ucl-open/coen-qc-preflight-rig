@@ -15,8 +15,8 @@ from pathlib import Path
 
 import yaml
 
-from coen_rig_check.plan import Planned, plan
-from coen_rig_check.rig import CheckedRig
+from coen_qc_preflight_rig.plan import Planned, plan
+from coen_qc_preflight_rig.rig import CheckedRig
 
 
 def read_raw(path: Path) -> dict[str, dict[str, tuple[str, str]]]:

@@ -9,7 +9,7 @@
                  xmlns:gl="clr-namespace:Bonsai.Shaders;assembly=Bonsai.Shaders"
                  xmlns:res="clr-namespace:Bonsai.Resources;assembly=Bonsai.System"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The pre-training rig check (PROTOTYPE). Which devices it checks comes from this machine's rig.yml: each SelectMany starts one branch per entry RigCheckDevices lists, and nothing for a kind the rig does not declare. Each branch writes raw rows (Device,Measure,Value,Detail); coen_rig_check.judge applies the thresholds.</Description>
+  <Description>The pre-training preflight (PROTOTYPE). Which devices it checks comes from this machine's rig.yml: each SelectMany starts one branch per entry PreflightDevices lists, and nothing for a kind the rig does not declare. Each branch writes raw rows (Device,Measure,Value,Detail); coen_qc_preflight_rig.judge applies the thresholds.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -19,7 +19,7 @@
         <Property Name="FileName" DisplayName="RawFile" Description="Where the raw rows go; a launch property." />
       </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="p1:RigCheckDevices">
+        <Combinator xsi:type="p1:PreflightDevices">
           <p1:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</p1:ConfigRoot>
           <p1:Kinds>behaviorBoard,timestampGeneratorGen3,stepperDriver,licketySplit</p1:Kinds>
         </Combinator>
@@ -82,7 +82,7 @@
         </Workflow>
       </Expression>
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="p1:RigCheckDevices">
+        <Combinator xsi:type="p1:PreflightDevices">
           <p1:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</p1:ConfigRoot>
           <p1:Kinds>camera</p1:Kinds>
         </Combinator>
@@ -144,7 +144,7 @@
         <Combinator xsi:type="rx:Merge" />
       </Expression>
       <Expression xsi:type="io:CsvWriter">
-        <io:FileName>rig-check-raw.csv</io:FileName>
+        <io:FileName>preflight-raw.csv</io:FileName>
         <io:Append>false</io:Append>
         <io:Overwrite>true</io:Overwrite>
         <io:Suffix>None</io:Suffix>
@@ -153,7 +153,7 @@
       </Expression>
       <Expression xsi:type="WorkflowOutput" />
       <Expression xsi:type="Combinator">
-        <Combinator xsi:type="p1:RigCheckDevices">
+        <Combinator xsi:type="p1:PreflightDevices">
           <p1:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</p1:ConfigRoot>
           <p1:Kinds>projectionCalibration</p1:Kinds>
         </Combinator>

@@ -17,7 +17,7 @@ wheels = [
 ]
 
 [[package]]
-name = "coen-rig-check"
+name = "coen-qc-preflight-rig"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
