@@ -8,4 +8,3 @@ __pycache__/
 *.layout
 src/bin/
 src/obj/
-local_packages/
