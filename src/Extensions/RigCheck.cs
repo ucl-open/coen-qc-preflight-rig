@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -25,6 +26,10 @@ public class RigCheckDevice
     public string PortName { get; set; }
     /// <summary>The entry's serialNumber, empty when it has none.</summary>
     public string SerialNumber { get; set; }
+    /// <summary>projectionCalibration's meshMapPath, empty elsewhere.</summary>
+    public string MeshMapPath { get; set; }
+    /// <summary>projectionCalibration's gammaLutPath, empty elsewhere.</summary>
+    public string GammaLutPath { get; set; }
 }
 
 /// <summary>One raw measurement, a row of the check's CSV: Device,Measure,Value,Detail.</summary>
@@ -99,6 +104,8 @@ public class RigCheckDevices
         device.Name = name;
         device.PortName = Setting(settings, "portName");
         device.SerialNumber = Setting(settings, "serialNumber");
+        device.MeshMapPath = Setting(settings, "meshMapPath");
+        device.GammaLutPath = Setting(settings, "gammaLutPath");
         return device;
     }
 
@@ -137,6 +144,7 @@ public class RigCheckDevices
 [Description("Counts what a device sends in a window after a warm-up; an error becomes an error row.")]
 public class CheckDevice
 {
+    static readonly TimeSpan Quiet = TimeSpan.FromSeconds(2);
     string measure = "messages";
     double warmup = 1;
     double seconds = 5;
@@ -165,12 +173,21 @@ public class CheckDevice
         var start = TimeSpan.FromSeconds(warmup);
         var end = TimeSpan.FromSeconds(warmup + seconds);
         var window = seconds.ToString(CultureInfo.InvariantCulture);
+        var clock = Stopwatch.StartNew();
+        // Ends on the source's own thread, at its first item past the window: ended from a timer, the
+        // projector's render chain was disposed off the GL thread and BonVision's RenderTexture
+        // crashed the process deleting its framebuffer (AccessViolationException, 7 Nov 2026). The
+        // timer only ends a source that goes quiet.
         return source
-            .SkipUntil(Observable.Timer(start))
-            .TakeUntil(Observable.Timer(end))
+            .Select(item => clock.Elapsed)
+            .TakeWhile(elapsed => elapsed < end)
+            .TakeUntil(Observable.Timer(end + Quiet))
+            .Where(elapsed => elapsed >= start)
             .Count()
             .SelectMany(n => new[] { Row(device, what, n.ToString(CultureInfo.InvariantCulture), string.Empty), Row(device, "seconds", window, string.Empty) })
-            .Catch<RigCheckRow, Exception>(error => Observable.Return(Row(device, "error", string.Empty, Clean(error))));
+            .Catch<RigCheckRow, Exception>(error => Observable.Return(Row(device, "error", string.Empty, Clean(error))))
+            // Each row on stderr as it is made: CsvWriter reaches disk only when the workflow ends.
+            .Do(row => Console.Error.WriteLine("rig check: " + row.Device + " " + row.Measure + " " + row.Value + " " + row.Detail));
     }
 
     static RigCheckRow Row(string device, string measure, string value, string detail)
