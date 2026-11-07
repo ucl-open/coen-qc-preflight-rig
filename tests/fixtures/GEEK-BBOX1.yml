@@ -1,0 +1,26 @@
+# yaml-language-server: $schema=C:/Github/Coen-Lab/coen-behaviour-box/src/DataSchemas/ucl_open_coen_behaviour_box.json#/$defs/BehaviourBoxRig
+# Rig configuration. Each device sits under its kind by name: the workflow drives behaviorBoard: main:
+# (BehaviorBoard-Main in the data) and camera: box: (Camera-Box), and stops at startup if either
+# is missing. The frame rate is behaviorBoard.main.cameraTriggerController.trigger0Frequency;
+# camera.box.triggerFrequency and trigger1Frequency are not used by this rig.
+behaviorBoard:
+  main:
+    cameraTriggerController:
+      trigger0Frequency: 50
+      trigger1Frequency: 50
+    portName: COM3
+    usbSerial: 'AB0M7PLB'
+    pulseController: null
+    runningWheel:
+      countsPerRev: 4096
+      wheelDiameterMm: 150.0
+camera:
+  box:
+    binning: 1
+    discriminatorType: SpinnakerCamera
+    exposureTime: 3000.0
+    gain: 1.0
+    serialNumber: '23201539'
+    triggerFrequency: 50.0
+rigId: B1
+rootPath: C:\Coen-Lab-Local\Acquired-Data

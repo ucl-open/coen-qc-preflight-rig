@@ -1,0 +1,29 @@
+[build-system]
+requires = ["uv_build>=0.8.22"]
+build-backend = "uv_build"
+
+[project]
+name = "coen-rig-check"
+description = "The pre-training rig check: one workflow for every rig, its checks chosen from the rig's rig.yml."
+license = "MIT"
+requires-python = ">=3.11, <3.12"
+version = "0.1.0"
+dependencies = [
+  "swc-aeon>=0.2.0",
+  "open-rigs",
+  "pyyaml",
+]
+
+[project.scripts]
+coen-rig-check = "coen_rig_check.cli:main"
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.uv.sources]
+open-rigs = { git = "https://github.com/Coen-Lab/lib-open-rigs", rev = "429506bf36196f8a1a2d8bdda36d069367db6516" }
+swc-aeon = { git = "https://github.com/SainsburyWellcomeCentre/aeon_api.git", branch = "main" }
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"

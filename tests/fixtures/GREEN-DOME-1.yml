@@ -1,0 +1,177 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ucl-open/av-dome/pip/main-switchover/src/DataSchemas/ucl_open_av_dome.json
+# GREEN-DOME-1, from config\rig-template.yml (pip/main-switchover). Values from production's
+# RigConfigs.cs and main.bonsai (ActiveExperiments) and rig-setup's 4 Nov 2026 hardware scan.
+#
+# av-dome rig configuration TEMPLATE
+#
+# Per-rig configuration files are NOT committed to this repo. To deploy a rig:
+#   1. Copy this file to <ConfigRoot>\<MACHINE-NAME>\rig.yml, where ConfigRoot is
+#      C:\Coen-Lab-Local\RigConfigs (the lab's place, as coen-behaviour-box's, kept apart from
+#      production's C:\RigConfigs), e.g. C:\Coen-Lab-Local\RigConfigs\GREEN-DOME-2\rig.yml. The workflow resolves the
+#      directory by hostname and fails at startup if it or rig.yml is missing.
+#   2. Fill in the values for that rig. Calibration artefacts (valve curves and the like) go in
+#      calibration\ beside rig.yml and are referenced by paths relative to that directory.
+#   3. Off-repo copies should replace the $schema path above with an absolute path
+#      to a checked-out src/DataSchemas/ucl_open_av_dome.json (or a raw GitHub URL)
+#      to keep editor validation working.
+#
+rootPath: C:\Coen-Lab-Local\Acquired-Data
+rigId: D1                 # two capitals or a capital and a digit, such as D1: rig-control's session numbering
+
+# Each kind of device is a group of named entries: behaviorBoard: main: is BehaviorBoard-Main in the
+# data and in live view. The workflow takes each device it drives by that name and stops at startup,
+# naming what this file has, if one is missing. usbSerial is the board's USB serial, an FTDI chip's
+# or a Pico's flash id (rig-setup's hardware scan lists each port's): RecordHarpDevices checks at
+# Start that the board on each portName has it, for every Harp board here, and stops the workflow
+# saying which board is where if not.
+behaviorBoard:
+  main:
+    portName: COM6
+    usbSerial: BG01WA0E
+    pulseController:
+      outputPulseEnable: "DO1, DO2, DO3"
+      # Each line is a FixedPulse (width set here) or a CalibratedPulse (width looked up per reward
+      # on a valve calibration curve in calibration\). A fixed reward line delivers ceil(ul / 2)
+      # pulses of its width, assuming 2 ul per pulse; a calibrated one delivers the requested volume.
+      outputs:
+        DO1: { discriminatorType: FixedPulse, pulseWidthMs: 50 }   # left reward valve, ms
+        DO2: { discriminatorType: FixedPulse, pulseWidthMs: 45 }   # right reward valve, ms
+        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 5 }    # Zapit TTL (used when zapit.hardwareTriggered is true)
+        # Calibrated reward line:
+        # DO1: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json }
+    cameraTriggerController:
+      trigger0Enabled: true     # camera trigger 0 shares the DO0 pin
+      trigger0Frequency: 50     # Hz
+      trigger1Enabled: false    # camera trigger 1 shares the DO1 pin, which drives the left valve; off means nothing is written to it
+      trigger1Frequency: 50     # Hz, used only if trigger 1 is enabled
+    runningWheel:
+      wheelDiameterMm: 170
+      countsPerRev: 4096
+
+timestampGeneratorGen3:
+  main:
+    portName: COM3
+    usbSerial: AQ03WH45
+    timerFrequency: Timer1000Hz
+
+# The lick spout stage's two Harp StepperDriver boards. The workflow drives the axes by motor
+# number, fixed: board a motor 0 left elevation (1), motor 1 right elevation (2), motor 2 right
+# radial (3); board b motor 0 left radial (4), motor 1 base transverse (5).
+stepperDriver:
+  a:
+    portName: COM4        # motors 1, 2, 3
+    usbSerial: AQ03WRBG
+  b:
+    portName: COM5        # motors 4, 5
+    usbSerial: AQ03WW0D
+
+licketySplit:
+  left:
+    portName: COM8
+    usbSerial: E664C856C360B937
+    channel0TriggerThreshold: 0     # ADC counts above which a lick registers
+    channel0UntriggerThreshold: 0   # ADC counts below which the lick ends
+  right:
+    portName: COM7
+    usbSerial: E664C856C31F4637
+    channel0TriggerThreshold: 0
+    channel0UntriggerThreshold: 0
+
+camera:
+  face:
+    serialNumber: "23100954"
+    exposureTime: 19000    # microseconds
+    gain: 0
+    binning: 1
+  pupil:
+    serialNumber: "23201536"
+    exposureTime: 19000    # microseconds
+    gain: 20
+    binning: 1
+  body:
+    serialNumber: "23199184"
+    exposureTime: 19000    # microseconds
+    gain: 0
+    binning: 1
+
+projectionCalibration:
+  meshMapPath: C:\Coen-Lab-Local\RigConfigs\GREEN-DOME-1\calibration\MeshMap.csv
+  gammaLutPath: C:\Coen-Lab-Local\RigConfigs\GREEN-DOME-1\calibration\gammalut.bmp
+
+speakerArray:
+  device:
+    deviceName: Speakers (XMOS xCORE-200 MC (UAC2.0))
+    hostApi: Windows WDM-KS
+    sampleRate: 48000       # Hz
+    channelCount: 32
+    suggestedLatency: 0.002 # s
+    bootDelay: 3.0          # s; guards a driver fault if the workflow stops during mixer init
+  syncChannel: 31           # carries a copy of each stimulus for alignment with acquisition
+  syncGain: 0.2
+  unusedChannels: [30]      # not connected
+  # Speakers currently wired on this rig. Position is relative to the subject:
+  # azimuth 0 = straight ahead, positive to the right; elevation 0 = horizontal.
+  # filter: the speaker's SpeakerFilter artefact (FIR taps), relative to this directory. The
+  # auditory stimuli are calibration\AuditoryStimuli\filtered_pink_pulse_train_0..99.wav.
+  speakers:
+    left:
+      position: { azimuth: -90, elevation: 15 }
+      channel: 0
+      filter: calibration/speaker-left.json
+    right:
+      position: { azimuth: 90, elevation: 15 }
+      channel: 1
+      filter: calibration/speaker-right.json
+    centre:
+      position: { azimuth: 0, elevation: 15 }
+      channel: 2
+      filter: calibration/speaker-centre.json
+  # Full 25-speaker dome layout, transcribed from the legacy SpeakerCalibration map in
+  # TrialTypeInitialise.cs. Channel numbers below are the legacy 1-based speaker IDs and MUST be
+  # re-checked against the actual mixer wiring before use. Enable per rig once the speakers are wired.
+  #   layer1_0:      { position: { azimuth: 0,      elevation: 75 },  channel: 1 }
+  #   layer1_90:     { position: { azimuth: 90,     elevation: 75 },  channel: 2 }
+  #   layer1_-90:    { position: { azimuth: -90,    elevation: 75 },  channel: 3 }
+  #   layer2_22:     { position: { azimuth: 22.5,   elevation: 45 },  channel: 4 }
+  #   layer2_67:     { position: { azimuth: 67.5,   elevation: 45 },  channel: 5 }
+  #   layer2_112:    { position: { azimuth: 112.5,  elevation: 45 },  channel: 6 }
+  #   layer2_-22:    { position: { azimuth: -22.5,  elevation: 45 },  channel: 7 }
+  #   layer2_-67:    { position: { azimuth: -67.5,  elevation: 45 },  channel: 8 }
+  #   layer2_-112:   { position: { azimuth: -112.5, elevation: 45 },  channel: 9 }
+  #   layer3_30:     { position: { azimuth: 30,     elevation: 15 },  channel: 10 }
+  #   layer3_60:     { position: { azimuth: 60,     elevation: 15 },  channel: 11 }
+  #   layer3_90:     { position: { azimuth: 90,     elevation: 15 },  channel: 12 }
+  #   layer3_120:    { position: { azimuth: 120,    elevation: 15 },  channel: 13 }
+  #   layer3_-30:    { position: { azimuth: -30,    elevation: 15 },  channel: 14 }
+  #   layer3_-60:    { position: { azimuth: -60,    elevation: 15 },  channel: 15 }
+  #   layer3_-90:    { position: { azimuth: -90,    elevation: 15 },  channel: 16 }
+  #   layer3_-120:   { position: { azimuth: -120,   elevation: 15 },  channel: 17 }
+  #   layer4_30:     { position: { azimuth: 30,     elevation: -15 }, channel: 18 }
+  #   layer4_60:     { position: { azimuth: 60,     elevation: -15 }, channel: 19 }
+  #   layer4_90:     { position: { azimuth: 90,     elevation: -15 }, channel: 20 }
+  #   layer4_120:    { position: { azimuth: 120,    elevation: -15 }, channel: 21 }
+  #   layer4_-30:    { position: { azimuth: -30,    elevation: -15 }, channel: 22 }
+  #   layer4_-60:    { position: { azimuth: -60,    elevation: -15 }, channel: 23 }
+  #   layer4_-90:    { position: { azimuth: -90,    elevation: -15 }, channel: 24 }
+  #   layer4_-120:   { position: { azimuth: -120,   elevation: -15 }, channel: 25 }
+
+# Which line drives each side's reward valve: a left reward pulses the left line, a right reward the
+# right line, each as its outputs entry says. Required; rig-control's Calibrations page names each
+# valve line's side from it too.
+rewardValves: { left: DO1, right: DO2 }
+interPulseInterval: 50   # ms between consecutive reward pulses; must let the valve seat
+
+# Zapit optogenetics server (tcpServer section of the Zapit settings file). Only contacted
+# when the task YAML sets optogenetics.enabled: true, so non-opto rigs can leave the defaults.
+zapit:
+  host: 127.0.0.1         # PC running Zapit; 127.0.0.1 when Zapit runs on this rig PC
+  port: 1488
+  hardwareTriggered: false  # true once DO<triggerLine> is cabled to the Zapit DAQ trigger input
+  triggerLine: 3            # behavior board DO line for the TTL; width from outputs.DO3
+# Default absolute stage position at session start (steps)
+lickSpoutDefaultPosition:
+  leftElevation: 0        # motor 1
+  rightElevation: 0       # motor 2
+  rightRadial: 0          # motor 3
+  leftRadial: 0           # motor 4
+  baseTransverse: 0       # motor 5

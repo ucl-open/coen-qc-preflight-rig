@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.pytest_cache/
+**/.bonsai/Packages/
+**/.bonsai/Bonsai.exe
+**/.bonsai/Bonsai.exe.settings
+**/.bonsai/Settings/
+*.layout
+src/bin/
+src/obj/
+local_packages/

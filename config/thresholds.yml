@@ -1,0 +1,9 @@
+# The rig check's thresholds: one per device kind, the same for every rig (consistent benchmarking).
+# The workflow measures; coen_rig_check.judge applies these. Prototype values, not yet agreed.
+behaviorBoard: { minMessages: 1 }           # Harp messages in the check's window
+timestampGeneratorGen3: { minMessages: 1 }
+stepperDriver: { minMessages: 1 }
+licketySplit: { minMessages: 1 }
+camera: { minRateFraction: 0.98 }           # frames per second over the triggering board's trigger0Frequency
+speakerArray: { personConfirms: true }      # asked at the end: heard the test sound from each speaker
+projectionCalibration: { personConfirms: true }  # asked at the end: the test pattern fills the dome

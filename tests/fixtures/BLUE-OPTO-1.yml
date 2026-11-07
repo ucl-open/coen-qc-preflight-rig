@@ -1,0 +1,123 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ucl-open/av-dome/pip/main-switchover/src/DataSchemas/ucl_open_av_dome.json
+# BLUE-OPTO-1, rewritten 7 Nov 2026 from its flat (pre-switchover) rig.yml into the keyed layout of
+# config\rig-template.yml (pip/main-switchover). Same values; usbSerials from rig-setup's 2 Nov 2026
+# hardware scan. Old file: _backups\BLUE-OPTO-1_rig_2026-11-07T13-22-00_before-keyed-layout.yml.
+# Production (ActiveExperiments) does not read this file.
+#
+# Each kind of device is a group of named entries: behaviorBoard: main: is BehaviorBoard-Main in the
+# data and in live view. The full 25-speaker dome layout is in config\rig-template.yml.
+rootPath: C:\Coen-Lab-Local\Acquired-Data
+
+behaviorBoard:
+  main:
+    portName: COM6
+    usbSerial: BG000OS0
+    pulseController:
+      outputPulseEnable: "DO1, DO2, DO3"
+      outputs:
+        DO1: { discriminatorType: FixedPulse, pulseWidthMs: 40 }   # left reward valve, ms
+        DO2: { discriminatorType: FixedPulse, pulseWidthMs: 25 }   # right reward valve, ms
+        # The old file enabled DO3 with no width; 5 ms is the template's. Used only when
+        # zapit.hardwareTriggered is true, which it is not here.
+        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 5 }    # Zapit TTL, ms
+    cameraTriggerController:
+      trigger0Enabled: true     # camera trigger 0 shares the DO0 pin
+      trigger0Frequency: 50     # Hz
+      trigger1Enabled: false    # camera trigger 1 shares the DO1 pin, which drives the left valve
+      trigger1Frequency: 50     # Hz, used only if trigger 1 is enabled
+    runningWheel:
+      wheelDiameterMm: 170
+      countsPerRev: 4096
+
+timestampGeneratorGen3:
+  main:
+    portName: COM5
+    usbSerial: AQ03WH4A
+    timerFrequency: Timer1000Hz
+
+# Board a motor 0 left elevation (1), motor 1 right elevation (2), motor 2 right radial (3);
+# board b motor 0 left radial (4), motor 1 base transverse (5).
+stepperDriver:
+  a:
+    portName: COM3        # motors 1, 2, 3
+    usbSerial: AQ03WRBF
+  b:
+    portName: COM4        # motors 4, 5
+    usbSerial: AQ03WRBV
+
+# Both Lickety Splits were unplugged at the 2 Nov scan: these usbSerials are what Windows last saw
+# on COM7 and COM11. Check them against the next scan.
+licketySplit:
+  left:
+    portName: COM7
+    usbSerial: E664C856C31C6C37
+    channel0TriggerThreshold: 0     # ADC counts above which a lick registers
+    channel0UntriggerThreshold: 0   # ADC counts below which the lick ends
+  right:
+    portName: COM11
+    usbSerial: E664C856C36C1B37
+    channel0TriggerThreshold: 0
+    channel0UntriggerThreshold: 0
+
+camera:
+  face:
+    serialNumber: "23201535"
+    exposureTime: 19000    # microseconds
+    gain: 0
+    binning: 1
+  pupil:
+    serialNumber: "26120781"
+    exposureTime: 19000    # microseconds
+    gain: 20
+    binning: 1
+  body:
+    serialNumber: "23199186"
+    exposureTime: 19000    # microseconds
+    gain: 0
+    binning: 1
+
+# Production's files, read only; copy them to calibration\ beside this file when the rig switches over.
+projectionCalibration:
+  meshMapPath: C:\RigConfigs\MeshMap.csv
+  gammaLutPath: C:\RigConfigs\gammalut.bmp
+
+speakerArray:
+  device:
+    deviceName: Speakers (XMOS xCORE-200 MC (UAC2.0))
+    hostApi: Windows WDM-KS
+    sampleRate: 48000       # Hz
+    channelCount: 32
+    suggestedLatency: 0.002 # s
+    bootDelay: 3.0          # s; guards a driver fault if the workflow stops during mixer init
+  syncChannel: 31           # carries a copy of each stimulus for alignment with acquisition
+  syncGain: 0.2
+  unusedChannels: [30]      # not connected
+  # Position is relative to the subject: azimuth 0 = straight ahead, positive to the right.
+  speakers:
+    left:
+      position: { azimuth: -90, elevation: 15 }
+      channel: 0
+    right:
+      position: { azimuth: 90, elevation: 15 }
+      channel: 1
+    centre:
+      position: { azimuth: 0, elevation: 15 }
+      channel: 2
+
+rewardValves: { left: DO1, right: DO2 }
+interPulseInterval: 50   # ms between consecutive reward pulses; must let the valve seat
+
+# Not in the old file: the schema's defaults, Zapit not hardware triggered.
+zapit:
+  host: 127.0.0.1
+  port: 1488
+  hardwareTriggered: false
+  triggerLine: 3
+
+# Default absolute stage position at session start (steps)
+lickSpoutDefaultPosition:
+  leftElevation: 2300        # motor 1
+  rightElevation: 7150       # motor 2
+  rightRadial: 8000          # motor 3
+  leftRadial: 5750           # motor 4
+  baseTransverse: 6350       # motor 5
