@@ -81,9 +81,41 @@ def test_a_device_rig_yml_does_not_declare_fails(tmp_path):
     assert record["devices"][-1]["why"] == "checked, but rig.yml does not declare it"
 
 
-def test_a_section_a_person_confirms(tmp_path):
+def _dome(tmp_path, projection):
     rows = [(d, "messages", "9", "") for d in DOME[:6]] + \
            [(d, m, v, "") for d in DOME[6:9] for m, v in (("frames", "250"), ("seconds", "5"))] + \
-           [("SpeakerArray", "person", "1", ""), ("ProjectionCalibration", "person", "0", "")]
+           [("SpeakerArray", "person", "1", "")] + [("ProjectionCalibration", m, v, "") for m, v in projection]
     record = judge.judge(FIXTURES / "GREEN-DOME-1.yml", _raw(tmp_path, rows), THRESHOLDS, "GREEN-DOME-1", "abc")
-    assert [d["device"] for d in record["devices"] if not d["ok"]] == ["ProjectionCalibration"]
+    return {d["device"]: d["why"] for d in record["devices"] if not d["ok"]}
+
+
+def test_a_section_a_person_confirms(tmp_path):
+    assert _dome(tmp_path, [("frames", "300"), ("seconds", "5"), ("person", "0")]) == \
+        {"ProjectionCalibration": "not confirmed by the person"}
+    assert _dome(tmp_path, [("frames", "300"), ("seconds", "5"), ("person", "1")]) == {}
+
+
+def test_a_slow_projector_fails_whatever_the_person_says(tmp_path):
+    assert _dome(tmp_path, [("frames", "50"), ("seconds", "5"), ("person", "1")]) == \
+        {"ProjectionCalibration": "10.0 frames/s drawn, 55 needed"}
+
+
+def test_the_record_is_dated_by_the_raw_file(tmp_path):
+    import os
+    from datetime import datetime, timezone
+
+    raw = _raw(tmp_path, GOOD_BOX)
+    then = datetime(2026, 11, 6, 9, 0, tzinfo=timezone.utc).timestamp()
+    os.utime(raw, (then, then))
+    record = judge.judge(FIXTURES / "GEEK-BBOX1.yml", raw, THRESHOLDS, "GEEK-BBOX1", "abc")
+    assert record["at"] == "2026-11-06T09:00:00+00:00"
+
+
+def test_check_commit_is_the_last_change_to_src_or_config():
+    repo = Path(__file__).parents[1]
+    import subprocess
+
+    want = subprocess.run(["git", "-C", str(repo), "log", "-1", "--format=%H", "--", "src", "config"],
+                          capture_output=True, text=True).stdout.strip()
+    assert want and judge.check_commit(repo) == want
+    assert judge.check_commit(repo / "no-such-folder") == ""

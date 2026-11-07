@@ -6,5 +6,6 @@ __pycache__/
 **/.bonsai/Bonsai.exe.settings
 **/.bonsai/Settings/
 *.layout
+src/preflight-raw.csv
 src/bin/
 src/obj/

@@ -6,4 +6,4 @@ stepperDriver: { minMessages: 1 }
 licketySplit: { minMessages: 1 }
 camera: { minRateFraction: 0.98 }           # frames per second over the triggering board's trigger0Frequency
 speakerArray: { personConfirms: true }      # asked at the end: heard the test sound from each speaker
-projectionCalibration: { personConfirms: true }  # asked at the end: the test pattern fills the dome
+projectionCalibration: { minFrameRate: 55, personConfirms: true }  # frames drawn per second at 60 Hz VSync; then asked at the end: the test pattern fills the dome

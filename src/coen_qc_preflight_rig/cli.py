@@ -1,4 +1,4 @@
-"""coen-qc-preflight-rig plan <rig.yml> | judge <rig.yml> <raw.csv> <out.json> --rig NAME --commit SHA."""
+"""coen-qc-preflight-rig plan <rig.yml> | judge <rig.yml> <raw.csv> <out.json> --rig NAME [--commit SHA]."""
 
 import argparse
 import json
@@ -6,7 +6,8 @@ from pathlib import Path
 
 from coen_qc_preflight_rig import judge, plan, rig
 
-THRESHOLDS = Path(__file__).resolve().parents[2] / "config" / "thresholds.yml"
+REPO = Path(__file__).resolve().parents[2]
+THRESHOLDS = REPO / "config" / "thresholds.yml"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -19,14 +20,16 @@ def main(argv: list[str] | None = None) -> int:
     sj.add_argument("raw", type=Path)
     sj.add_argument("out", type=Path)
     sj.add_argument("--rig", required=True)
-    sj.add_argument("--commit", required=True)
+    sj.add_argument("--commit", default=None,
+                    help="the check's version; by default the last commit that changed src or config, as rig-control reads it")
     sj.add_argument("--thresholds", type=Path, default=THRESHOLDS)
     a = p.parse_args(argv)
     if a.cmd == "plan":
         for d in plan.plan(rig.load(a.rig_yml)):
             print(d.name)
         return 0
-    record = judge.judge(a.rig_yml, a.raw, a.thresholds, a.rig, a.commit)
+    commit = a.commit if a.commit is not None else judge.check_commit(REPO)
+    record = judge.judge(a.rig_yml, a.raw, a.thresholds, a.rig, commit)
     judge.write(record, a.out)
     print(json.dumps(record, indent=2))
     return 0 if record["passed"] else 1

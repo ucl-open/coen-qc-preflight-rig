@@ -10,6 +10,7 @@ branches never passes.
 import csv
 import hashlib
 import json
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -50,8 +51,15 @@ def device_verdict(device: Planned, measures: dict | None, limits: dict, rig: Ch
         return "did not report"
     if "error" in measures:
         return measures["error"][1] or measures["error"][0] or "failed"
+    if "minFrameRate" in limits:  # frames drawn, as the projector's: judged before any person's word
+        frames, seconds = _number(measures, "frames"), _number(measures, "seconds")
+        rate = frames / seconds if frames and seconds else 0.0
+        if rate < limits["minFrameRate"]:
+            return f"{rate:.1f} frames/s drawn, {limits['minFrameRate']} needed"
     if "personConfirms" in limits:
         return "" if _number(measures, "person") == 1 else "not confirmed by the person"
+    if "minFrameRate" in limits:
+        return ""
     if "minMessages" in limits:
         n = _number(measures, "messages")
         return "" if n is not None and n >= limits["minMessages"] else f"{n or 0:g} messages, {limits['minMessages']} needed"
@@ -65,8 +73,20 @@ def device_verdict(device: Planned, measures: dict | None, limits: dict, rig: Ch
     return f"no threshold for {device.kind}"
 
 
+def check_commit(clone: Path) -> str:
+    """The last commit that changed the check (src, config), never its packages: what rig-control's gate
+    compares, so the lab's package bumps leave a pass standing (audit, 7 Nov 2026); "" without git."""
+    try:
+        done = subprocess.run(["git", "-C", str(clone), "log", "-1", "--format=%H", "--", "src", "config"],
+                              capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return done.stdout.strip() if done.returncode == 0 else ""
+
+
 def judge(rig_yml: Path, raw: Path, thresholds: Path, rig_name: str, commit: str) -> dict:
-    """The pass record: what the rig-control gate reads."""
+    """The pass record: what the rig-control gate reads. Dated by the raw file, when it was measured, so a
+    file left from an earlier run is never a fresh pass (audit, 7 Nov 2026)."""
     rig = CheckedRig.model_validate(yaml.safe_load(Path(rig_yml).read_text(encoding="utf-8-sig")) or {})
     limits = yaml.safe_load(Path(thresholds).read_text(encoding="utf-8")) or {}
     rows = read_raw(raw)
@@ -79,7 +99,7 @@ def judge(rig_yml: Path, raw: Path, thresholds: Path, rig_name: str, commit: str
         devices.append({"device": extra, "ok": False, "why": "checked, but rig.yml does not declare it"})
     return {
         "rig": rig_name,
-        "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "at": datetime.fromtimestamp(Path(raw).stat().st_mtime, timezone.utc).isoformat(timespec="seconds"),
         "passed": bool(devices) and all(d["ok"] for d in devices),
         "rigYmlSha256": hashlib.sha256(Path(rig_yml).read_bytes()).hexdigest(),
         "checkCommit": commit,

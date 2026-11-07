@@ -16,7 +16,7 @@ The Coen Lab's pre-training preflight: one Bonsai workflow for every rig, checki
 ```
 scripts\deploy.ps1          # Bonsai and its packages into .bonsai\, as rig-setup does
 uv run coen-qc-preflight-rig plan <rig.yml>
-uv run coen-qc-preflight-rig judge <rig.yml> <raw.csv> <out.json> --rig <RIG> --commit <sha>
+uv run coen-qc-preflight-rig judge <rig.yml> <raw.csv> <out.json> --rig <RIG>   # dated by the raw file; the check's version is the last commit to src or config, as rig-control reads it
 .bonsai\Bonsai.exe src\main.bonsai --no-editor --property:ConfigRoot=<dir> --property:RawFile=<csv> [--property:ProjectionWindowState=Normal --property:ProjectionWidth=640 --property:ProjectionHeight=360]
 ```
 
