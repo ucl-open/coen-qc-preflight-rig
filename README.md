@@ -22,7 +22,7 @@ uv run coen-qc-preflight-rig judge <rig.yml> <raw.csv> <out.json> --rig <RIG>   
 
 ## Not yet
 
-- The checks a person confirms at the end (speakers heard, projection seen), asked together after everything automatic.
+- The checks a person confirms at the end (speakers heard, projection seen, a drop seen at each reward valve, the wheel turned and counted), asked together after everything automatic.
 - The behaviour board starting its camera trigger, without which a triggered camera counts no frames.
 - `ExperimentControl`, so rig-control can launch it from a Preflight card on its Calibrations page.
 - Thresholds set on a rig.
