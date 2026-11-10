@@ -35,8 +35,8 @@ timestampGeneratorGen3:
     usbSerial: AQ03WH4A
     timerFrequency: Timer1000Hz
 
-# Board a motor 0 left elevation (1), motor 1 right elevation (2), motor 2 right radial (3);
-# board b motor 0 left radial (4), motor 1 base transverse (5).
+# Board a motor 0 base transverse (1), motor 1 left radial (2), motor 2 right radial (3);
+# board b motor 0 left elevation (4), motor 1 right elevation (5).
 stepperDriver:
   a:
     portName: COM3        # motors 1, 2, 3
@@ -116,8 +116,8 @@ zapit:
 
 # Default absolute stage position at session start (steps)
 lickSpoutDefaultPosition:
-  leftElevation: 2300        # motor 1
-  rightElevation: 7150       # motor 2
+  baseTransverse: 2300       # motor 1
+  leftRadial: 7150           # motor 2
   rightRadial: 8000          # motor 3
-  leftRadial: 5750           # motor 4
-  baseTransverse: 6350       # motor 5
+  leftElevation: 5750        # motor 4
+  rightElevation: 6350       # motor 5

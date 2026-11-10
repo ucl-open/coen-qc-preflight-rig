@@ -55,8 +55,8 @@ timestampGeneratorGen3:
     timerFrequency: Timer1000Hz
 
 # The lick spout stage's two Harp StepperDriver boards. The workflow drives the axes by motor
-# number, fixed: board a motor 0 left elevation (1), motor 1 right elevation (2), motor 2 right
-# radial (3); board b motor 0 left radial (4), motor 1 base transverse (5).
+# number, fixed: board a motor 0 base transverse (1), motor 1 left radial (2), motor 2 right
+# radial (3); board b motor 0 left elevation (4), motor 1 right elevation (5).
 stepperDriver:
   a:
     portName: COM4        # motors 1, 2, 3
@@ -170,8 +170,8 @@ zapit:
   triggerLine: 3            # behavior board DO line for the TTL; width from outputs.DO3
 # Default absolute stage position at session start (steps)
 lickSpoutDefaultPosition:
-  leftElevation: 0        # motor 1
-  rightElevation: 0       # motor 2
+  baseTransverse: 0       # motor 1
+  leftRadial: 0           # motor 2
   rightRadial: 0          # motor 3
-  leftRadial: 0           # motor 4
-  baseTransverse: 0       # motor 5
+  leftElevation: 0        # motor 4
+  rightElevation: 0       # motor 5
