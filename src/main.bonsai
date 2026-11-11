@@ -48,6 +48,10 @@
                   <Description>One pulse on a behaviour board line: the text is the board and line, such as BehaviorBoard-Main DO1. Its length is the line's pulseWidthMs in rig.yml, else 50 ms.</Description>
                 </Command>
                 <Command>
+                  <Name>Move</Name>
+                  <Description>Steps on a stepper driver motor its rig.yml wiring names, from where it is: the text is the driver, motor and steps, such as StepperDriver-A Motor1 -150.</Description>
+                </Command>
+                <Command>
                   <Name>Confirm</Name>
                   <Description>The person's answer for a device the check asks about, after Go: the text is the device and yes or no, such as SpeakerArray yes.</Description>
                 </Command>
@@ -127,6 +131,11 @@
                       <Property Name="PulseWidths" Selector="PulseWidths" />
                       <Property Name="Trigger0Frequency" Selector="Trigger0Frequency" />
                       <Property Name="RunningWheel" Selector="RunningWheel" />
+                      <Property Name="WiredMotors" Selector="WiredMotors" />
+                      <Property Name="WiredInputs" Selector="WiredInputs" />
+                      <Property Name="StepInterval" Selector="StepInterval" />
+                      <Property Name="MicrostepResolution" Selector="MicrostepResolution" />
+                      <Property Name="MaximumRunCurrent" Selector="MaximumRunCurrent" />
                     </PropertyMappings>
                   </Expression>
                   <Expression xsi:type="Combinator">
@@ -175,11 +184,21 @@
                   <Expression xsi:type="Combinator">
                     <Combinator xsi:type="p1:ShareDeviceData" />
                   </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>ControlEvents</Name>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="orcl:OnCommand">
+                      <orcl:Name>Move</orcl:Name>
+                    </Combinator>
+                  </Expression>
                 </Nodes>
                 <Edges>
                   <Edge From="0" To="1" Label="Source1" />
                   <Edge From="2" To="3" Label="Source1" />
                   <Edge From="3" To="6" Label="Source1" />
+                  <Edge From="16" To="17" Label="Source1" />
+                  <Edge From="17" To="6" Label="Source3" />
                   <Edge From="4" To="5" Label="Source1" />
                   <Edge From="5" To="6" Label="Source2" />
                   <Edge From="6" To="9" Label="Source1" />

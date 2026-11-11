@@ -51,6 +51,16 @@ public class PreflightDevice
     public int Binning { get; set; }
     /// <summary>A camera's pixelFormat, else Mono8.</summary>
     public string PixelFormat { get; set; }
+    /// <summary>A stepper driver's motors its rig.yml wiring names, as Harp.StepperDriver's StepperMotors bits (Motor0 = 1); 0 elsewhere.</summary>
+    public int WiredMotors { get; set; }
+    /// <summary>A stepper driver's inputs its rig.yml wiring names, as DigitalInputs bits (Input0 = 1); 0 elsewhere.</summary>
+    public int WiredInputs { get; set; }
+    /// <summary>A stepper driver's stepInterval in microseconds; 0 when rig.yml gives none.</summary>
+    public int StepInterval { get; set; }
+    /// <summary>A stepper driver's microstepResolution, such as Microstep8; empty when rig.yml gives none.</summary>
+    public string MicrostepResolution { get; set; }
+    /// <summary>A stepper driver's maximumRunCurrent in A; 0 when rig.yml gives none.</summary>
+    public double MaximumRunCurrent { get; set; }
 }
 
 /// <summary>One raw measurement, a row of the check's CSV: Device,Measure,Value,Detail.</summary>
@@ -209,6 +219,22 @@ public class PreflightDevices
         device.Binning = (int)Number(settings, "binning", 1);
         device.PixelFormat = Setting(settings, "pixelFormat");
         if (device.PixelFormat.Length == 0) device.PixelFormat = "Mono8";
+        device.StepInterval = (int)Number(settings, "stepInterval", 0);
+        device.MicrostepResolution = Setting(settings, "microstepResolution");
+        device.MaximumRunCurrent = Number(settings, "maximumRunCurrent", 0);
+        var wiring = Child(settings, "wiring");
+        if (wiring != null)
+        {
+            // The lab's HarpStepperDriver wiring: Motor0-3 and Input0-3, each naming what it drives or reads.
+            foreach (var line in wiring.Children)
+            {
+                var key = (Scalar(line.Key) ?? string.Empty).ToLowerInvariant();
+                int n;
+                if (!(line.Value is YamlMappingNode) || key.Length < 6 || !int.TryParse(key.Substring(key.Length - 1), out n) || n > 3) continue;
+                if (key.StartsWith("motor")) device.WiredMotors |= 1 << n;
+                else if (key.StartsWith("input")) device.WiredInputs |= 1 << n;
+            }
+        }
         return device;
     }
 
@@ -632,7 +658,7 @@ public class CloseWhen
 /// </summary>
 [Combinator]
 [WorkflowElementCategory(ElementCategory.Transform)]
-[Description("Harp writes to this behaviour board: camera trigger 0 started when it opens, and each Pulse command's line set, then cleared after its pulse width.")]
+[Description("Harp writes to this board: a behaviour board's camera trigger 0 and each Pulse; a stepper driver's setup from rig.yml and each Move.")]
 public class BoardWrites
 {
     const int OutputSet = 34;
@@ -657,12 +683,37 @@ public class BoardWrites
     public int Trigger0Frequency { get; set; }
     /// <summary>rig.yml has a runningWheel for this board: its encoder is enabled, in Position mode, and reset.</summary>
     public bool RunningWheel { get; set; }
+    /// <summary>A stepper driver's motors its wiring names (StepperMotors bits): enabled, and the only ones Move drives.</summary>
+    public int WiredMotors { get; set; }
+    /// <summary>A stepper driver's inputs its wiring names (DigitalInputs bits): enabled, Input n stopping Motor n on falling where Motor n is wired.</summary>
+    public int WiredInputs { get; set; }
+    /// <summary>A stepper driver's stepInterval in microseconds; 0 leaves it.</summary>
+    public int StepInterval { get; set; }
+    /// <summary>A stepper driver's microstepResolution, such as Microstep8; empty leaves it.</summary>
+    public string MicrostepResolution { get; set; }
+    /// <summary>A stepper driver's maximumRunCurrent in A; 0 leaves it.</summary>
+    public double MaximumRunCurrent { get; set; }
 
-    /// <summary>The trigger and encoder writes when the board opens, then the writes for each Pulse command to this board.</summary>
-    public IObservable<HarpMessage> Process(IObservable<string> commands)
+    // Harp.StepperDriver 0.4.0's registers: EnableDriver and EnableDigitalInputs (U8 bits), per motor
+    // MicrostepResolution (U8), MaximumRunCurrent (float), StepInterval (U16) and MoveRelative (S32),
+    // per input OpMode (U8, StopMotor<n>OnFalling = 32 + n), InterlockEnabled (U8, Open = 1) and
+    // AccumulatedStepsSamplingRate (U8, Rate10Hz = 1), as av-dome writes them.
+    const int EnableDriver = 32;
+    const int EnableDigitalInputs = 36;
+    const int Motor0MicrostepResolution = 42;
+    const int Motor0MaximumRunCurrent = 46;
+    const int Motor0StepInterval = 54;
+    const int Input0OpMode = 68;
+    const int InterlockEnabled = 72;
+    const int AccumulatedStepsSamplingRate = 73;
+    const int Motor0MoveRelative = 81;
+
+    /// <summary>The board's writes when it opens, then those for each Pulse command (a behaviour board) or Move command (a stepper driver) to it.</summary>
+    public IObservable<HarpMessage> Process(IObservable<string> pulses, IObservable<string> moves)
     {
         return Observable.Defer(() =>
         {
+            if (Kind == "stepperDriver") return Stepper().ToObservable().Concat(Moves(moves));
             var board = Kind == "behaviorBoard";
             var start = new List<HarpMessage>();
             if (board && RunningWheel)
@@ -676,7 +727,59 @@ public class BoardWrites
                 start.Add(HarpMessage.FromUInt16(Camera0Frequency, MessageType.Write, (ushort)Trigger0Frequency));
                 start.Add(HarpMessage.FromByte(StartCameras, MessageType.Write, 1));
             }
-            return start.ToObservable().Concat(Pulses(commands, board));
+            return start.ToObservable().Concat(Pulses(pulses, board));
+        });
+    }
+
+    // A stepper driver's setup from rig.yml (Pip, 11 Nov 2026: "rig.yml, one source"): only the motors and
+    // inputs its wiring names, its settings where rig.yml gives them, and positions sent 10 times a second.
+    List<HarpMessage> Stepper()
+    {
+        var start = new List<HarpMessage>();
+        start.Add(HarpMessage.FromByte(InterlockEnabled, MessageType.Write, 1));
+        start.Add(HarpMessage.FromByte(EnableDriver, MessageType.Write, (byte)WiredMotors));
+        byte resolution = 0;
+        var resolutions = new[] { "Microstep8", "Microstep16", "Microstep32", "Microstep64" };
+        var r = Array.IndexOf(resolutions, MicrostepResolution ?? string.Empty);
+        if (r >= 0) resolution = (byte)r;
+        else if (!string.IsNullOrEmpty(MicrostepResolution))
+            throw new InvalidOperationException(Device + ": rig.yml's microstepResolution is '" + MicrostepResolution + "', not Microstep8, 16, 32 or 64");
+        for (var n = 0; n < 4; n++)
+        {
+            if ((WiredMotors & (1 << n)) == 0) continue;
+            if (r >= 0) start.Add(HarpMessage.FromByte(Motor0MicrostepResolution + n, MessageType.Write, resolution));
+            if (MaximumRunCurrent > 0) start.Add(HarpMessage.FromSingle(Motor0MaximumRunCurrent + n, MessageType.Write, (float)MaximumRunCurrent));
+            if (StepInterval > 0) start.Add(HarpMessage.FromUInt16(Motor0StepInterval + n, MessageType.Write, (ushort)StepInterval));
+        }
+        start.Add(HarpMessage.FromByte(AccumulatedStepsSamplingRate, MessageType.Write, 1));
+        start.Add(HarpMessage.FromByte(EnableDigitalInputs, MessageType.Write, (byte)WiredInputs));
+        for (var n = 0; n < 4; n++)
+        {
+            if ((WiredInputs & (1 << n)) != 0 && (WiredMotors & (1 << n)) != 0)
+                start.Add(HarpMessage.FromByte(Input0OpMode + n, MessageType.Write, (byte)(32 + n)));
+        }
+        return start;
+    }
+
+    // Move <Device> <Motor> <steps>, such as StepperDriver-A Motor1 -150: that many steps from where the motor is,
+    // for a motor the wiring names; any other is ignored, said on stderr.
+    IObservable<HarpMessage> Moves(IObservable<string> moves)
+    {
+        var name = Device;
+        var wired = WiredMotors;
+        return moves.SelectMany(text =>
+        {
+            var parts = (text ?? string.Empty).Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 3 || parts[0] != name) return Observable.Empty<HarpMessage>();
+            int n, steps;
+            var motor = parts[1].ToLowerInvariant();
+            if (!motor.StartsWith("motor") || !int.TryParse(motor.Substring(5), out n) || n < 0 || n > 3 || (wired & (1 << n)) == 0
+                || !int.TryParse(parts[2], NumberStyles.Integer, Preflight.Invariant, out steps))
+            {
+                Console.Error.WriteLine("preflight: Move '" + text + "' ignored: give the driver, a motor its wiring names, and whole steps");
+                return Observable.Empty<HarpMessage>();
+            }
+            return Observable.Return(HarpMessage.FromInt32(Motor0MoveRelative + n, MessageType.Write, steps));
         });
     }
 
