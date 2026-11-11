@@ -48,6 +48,10 @@
                   <Description>One pulse on a behaviour board line: the text is the board and line, such as BehaviorBoard-Main DO1. Its length is the line's pulseWidthMs in rig.yml, else 50 ms, or a width in ms given third, 1 to 60000 (BehaviorBoard-Main DO1 10000: rig-control's Flush, a valve open 10 s). On DO0 to DO3 the board times it, so it ends even if the workflow stops.</Description>
                 </Command>
                 <Command>
+                  <Name>Reset</Name>
+                  <Description>Every behaviour board put back as an experiment expects it: each DO line closed now (a Flush too; DO0 left to the camera trigger when it runs), each line's PulseDO width and OutputPulseEnable as rig.yml has them. The text is empty for every board, or a board's name. rig-control's End Testing sends it before the stop.</Description>
+                </Command>
+                <Command>
                   <Name>Move</Name>
                   <Description>Steps on a stepper driver motor its rig.yml wiring names, from where it is: the text is the driver, motor and steps, such as StepperDriver-A Motor1 -150.</Description>
                 </Command>
@@ -133,6 +137,7 @@
                       <Property Name="Device" Selector="Name" />
                       <Property Name="Kind" Selector="Kind" />
                       <Property Name="PulseWidths" Selector="PulseWidths" />
+                      <Property Name="OutputPulseEnable" Selector="OutputPulseEnable" />
                       <Property Name="Trigger0Frequency" Selector="Trigger0Frequency" />
                       <Property Name="RunningWheel" Selector="RunningWheel" />
                       <Property Name="WiredMotors" Selector="WiredMotors" />
@@ -204,9 +209,19 @@
                       <orcl:Name>Home</orcl:Name>
                     </Combinator>
                   </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>ControlEvents</Name>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="orcl:OnCommand">
+                      <orcl:Name>Reset</orcl:Name>
+                    </Combinator>
+                  </Expression>
                 </Nodes>
                 <Edges>
                   <Edge From="0" To="1" Label="Source1" />
+                  <Edge From="20" To="21" Label="Source1" />
+                  <Edge From="21" To="6" Label="Source5" />
                   <Edge From="2" To="3" Label="Source1" />
                   <Edge From="3" To="6" Label="Source1" />
                   <Edge From="16" To="17" Label="Source1" />
