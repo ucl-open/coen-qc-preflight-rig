@@ -719,6 +719,7 @@ public class BoardWrites
     const int InterlockEnabled = 72;
     const int AccumulatedStepsSamplingRate = 73;
     const int Motor0MoveRelative = 81;
+    const int Motor0MoveAbsolute = 86;  // S32, steps from home
     const int DigitalInputState = 78;
     const int Motor0AccumulatedSteps = 91;
     const int StopMotors = 110;
@@ -839,8 +840,9 @@ public class BoardWrites
         return start;
     }
 
-    // Move <Device> <Motor> <steps>, such as StepperDriver-A Motor1 -150: that many steps from where the motor is,
-    // for a motor the wiring names; any other is ignored, said on stderr.
+    // Move <Device> <Motor> <steps>, such as StepperDriver-A Motor1 -150: that many steps from where the motor is;
+    // Move <Device> <Motor> to <position>, such as StepperDriver-A Motor1 to 5900: to that position, in steps from
+    // home. For a motor the wiring names; any other is ignored, said on stderr.
     IObservable<HarpMessage> Moves(IObservable<string> moves)
     {
         var name = Device;
@@ -848,16 +850,18 @@ public class BoardWrites
         return moves.SelectMany(text =>
         {
             var parts = (text ?? string.Empty).Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length != 3 || parts[0] != name) return Observable.Empty<HarpMessage>();
+            if (parts.Length < 3 || parts[0] != name) return Observable.Empty<HarpMessage>();
+            var absolute = parts.Length == 4 && parts[2] == "to";
             int n, steps;
             var motor = parts[1].ToLowerInvariant();
-            if (!motor.StartsWith("motor") || !int.TryParse(motor.Substring(5), out n) || n < 0 || n > 3 || (wired & (1 << n)) == 0
-                || !int.TryParse(parts[2], NumberStyles.Integer, Preflight.Invariant, out steps))
+            if ((parts.Length != 3 && !absolute) || !motor.StartsWith("motor") || !int.TryParse(motor.Substring(5), out n)
+                || n < 0 || n > 3 || (wired & (1 << n)) == 0
+                || !int.TryParse(parts[parts.Length - 1], NumberStyles.Integer, Preflight.Invariant, out steps))
             {
-                Console.Error.WriteLine("preflight: Move '" + text + "' ignored: give the driver, a motor its wiring names, and whole steps");
+                Console.Error.WriteLine("preflight: Move '" + text + "' ignored: give the driver, a motor its wiring names, and whole steps (or 'to' and a position)");
                 return Observable.Empty<HarpMessage>();
             }
-            return Observable.Return(HarpMessage.FromInt32(Motor0MoveRelative + n, MessageType.Write, steps));
+            return Observable.Return(HarpMessage.FromInt32((absolute ? Motor0MoveAbsolute : Motor0MoveRelative) + n, MessageType.Write, steps));
         });
     }
 
