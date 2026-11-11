@@ -38,6 +38,16 @@ public class PreflightDevice
     public string GammaLutPath { get; set; }
     /// <summary>A behaviour board's pulseController outputs' pulseWidthMs, such as DO1=50,DO2=45; empty elsewhere.</summary>
     public string PulseWidths { get; set; }
+    /// <summary>A behaviour board's cameraTriggerController trigger0Frequency in Hz; 0 when trigger 0 is not enabled, and elsewhere.</summary>
+    public int Trigger0Frequency { get; set; }
+    /// <summary>A camera's exposureTime in microseconds, else 19000.</summary>
+    public double ExposureTime { get; set; }
+    /// <summary>A camera's gain, else 0.</summary>
+    public double Gain { get; set; }
+    /// <summary>A camera's binning, else 1.</summary>
+    public int Binning { get; set; }
+    /// <summary>A camera's pixelFormat, else Mono8.</summary>
+    public string PixelFormat { get; set; }
 }
 
 /// <summary>One raw measurement, a row of the check's CSV: Device,Measure,Value,Detail.</summary>
@@ -187,7 +197,25 @@ public class PreflightDevices
             }
         }
         device.PulseWidths = string.Join(",", widths);
+        var trigger = Child(settings, "cameraTriggerController");
+        if (Setting(trigger, "trigger0Enabled").ToLowerInvariant() == "true")
+            device.Trigger0Frequency = (int)Number(trigger, "trigger0Frequency", 50);
+        device.ExposureTime = Number(settings, "exposureTime", 19000);
+        device.Gain = Number(settings, "gain", 0);
+        device.Binning = (int)Number(settings, "binning", 1);
+        device.PixelFormat = Setting(settings, "pixelFormat");
+        if (device.PixelFormat.Length == 0) device.PixelFormat = "Mono8";
         return device;
+    }
+
+    static double Number(YamlMappingNode settings, string key, double otherwise)
+    {
+        var text = Setting(settings, key);
+        if (text.Length == 0) return otherwise;
+        double value;
+        if (!double.TryParse(text, NumberStyles.Float, Preflight.Invariant, out value))
+            throw new InvalidOperationException("rig.yml's " + key + " is '" + text + "', not a number");
+        return value;
     }
 
     static YamlMappingNode Child(YamlMappingNode settings, string key)
@@ -591,54 +619,74 @@ public class CloseWhen
 }
 
 /// <summary>
-/// A behaviour board's pulse from the Pulse command (Device Line, such as BehaviorBoard-Main DO1): the
-/// line set, then cleared after its pulseWidthMs in rig.yml, else 50 ms. Other devices' commands, and
-/// any board that is not a behaviour board, give nothing.
+/// A behaviour board's writes. When the board opens, with trigger 0 enabled in rig.yml: camera trigger 0
+/// at its frequency, then started, so the cameras get frames. The board stops it itself when Device
+/// closes it at Stop, as the firmware stops both camera outputs on going to Standby. Then for each Pulse
+/// command (Device Line, such as BehaviorBoard-Main DO1): the line set, then cleared after its
+/// pulseWidthMs in rig.yml, else 50 ms. Other devices' commands, and any board that is not a behaviour
+/// board, give nothing.
 /// </summary>
 [Combinator]
 [WorkflowElementCategory(ElementCategory.Transform)]
-[Description("Harp writes for a Pulse command to this behaviour board: the line set, then cleared after its pulse width.")]
-public class BoardPulses
+[Description("Harp writes to this behaviour board: camera trigger 0 started when it opens, and each Pulse command's line set, then cleared after its pulse width.")]
+public class BoardWrites
 {
     const int OutputSet = 34;
     const int OutputClear = 35;
+    // Harp.Behavior's device.yml: StartCameras (U8, CameraOutput0 = 1) and Camera0Frequency (U16, Hz).
+    const int StartCameras = 78;
+    const int Camera0Frequency = 93;
 
     /// <summary>The board's name.</summary>
     public string Device { get; set; }
-    /// <summary>The board's rig.yml kind; only behaviorBoard pulses.</summary>
+    /// <summary>The board's rig.yml kind; only behaviorBoard is written to.</summary>
     public string Kind { get; set; }
     /// <summary>The board's pulse widths, such as DO1=50,DO2=45.</summary>
     public string PulseWidths { get; set; }
+    /// <summary>Camera trigger 0's frequency in Hz; 0 leaves the trigger alone.</summary>
+    public int Trigger0Frequency { get; set; }
 
-    /// <summary>The writes for each Pulse command to this board.</summary>
+    /// <summary>The trigger writes when the board opens, then the writes for each Pulse command to this board.</summary>
     public IObservable<HarpMessage> Process(IObservable<string> commands)
     {
         return Observable.Defer(() =>
         {
-            var name = Device;
             var board = Kind == "behaviorBoard";
-            var widths = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
-            foreach (var pair in (PulseWidths ?? string.Empty).Split(','))
-            {
-                var cut = pair.IndexOf('=');
-                double ms;
-                if (cut > 0 && double.TryParse(pair.Substring(cut + 1), NumberStyles.Float, Preflight.Invariant, out ms)) widths[pair.Substring(0, cut).Trim()] = ms;
-            }
-            return commands.SelectMany(text =>
-            {
-                var parts = (text ?? string.Empty).Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                if (!board || parts.Length != 2 || parts[0] != name) return Observable.Empty<HarpMessage>();
-                var mask = Mask(parts[1]);
-                if (mask == 0)
+            var start = board && Trigger0Frequency > 0
+                ? new[]
                 {
-                    Console.Error.WriteLine("preflight: Pulse '" + text + "' ignored: the line is DO0 to DO3 or DOPort0 to DOPort2");
-                    return Observable.Empty<HarpMessage>();
+                    HarpMessage.FromUInt16(Camera0Frequency, MessageType.Write, (ushort)Trigger0Frequency),
+                    HarpMessage.FromByte(StartCameras, MessageType.Write, 1),
                 }
-                double ms;
-                if (!widths.TryGetValue(parts[1], out ms)) ms = 50;
-                return Observable.Return(HarpMessage.FromUInt16(OutputSet, MessageType.Write, mask))
-                    .Concat(Observable.Timer(TimeSpan.FromMilliseconds(ms)).Select(_ => HarpMessage.FromUInt16(OutputClear, MessageType.Write, mask)));
-            });
+                : new HarpMessage[0];
+            return start.ToObservable().Concat(Pulses(commands, board));
+        });
+    }
+
+    IObservable<HarpMessage> Pulses(IObservable<string> commands, bool board)
+    {
+        var name = Device;
+        var widths = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in (PulseWidths ?? string.Empty).Split(','))
+        {
+            var cut = pair.IndexOf('=');
+            double ms;
+            if (cut > 0 && double.TryParse(pair.Substring(cut + 1), NumberStyles.Float, Preflight.Invariant, out ms)) widths[pair.Substring(0, cut).Trim()] = ms;
+        }
+        return commands.SelectMany(text =>
+        {
+            var parts = (text ?? string.Empty).Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (!board || parts.Length != 2 || parts[0] != name) return Observable.Empty<HarpMessage>();
+            var mask = Mask(parts[1]);
+            if (mask == 0)
+            {
+                Console.Error.WriteLine("preflight: Pulse '" + text + "' ignored: the line is DO0 to DO3 or DOPort0 to DOPort2");
+                return Observable.Empty<HarpMessage>();
+            }
+            double ms;
+            if (!widths.TryGetValue(parts[1], out ms)) ms = 50;
+            return Observable.Return(HarpMessage.FromUInt16(OutputSet, MessageType.Write, mask))
+                .Concat(Observable.Timer(TimeSpan.FromMilliseconds(ms)).Select(_ => HarpMessage.FromUInt16(OutputClear, MessageType.Write, mask)));
         });
     }
 

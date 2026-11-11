@@ -4,13 +4,14 @@
                  xmlns:p1="clr-namespace:;assembly=Extensions"
                  xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
                  xmlns:spk="clr-namespace:Bonsai.Spinnaker;assembly=Bonsai.Spinnaker"
+                 xmlns:vid="clr-namespace:OpenRigs.Video;assembly=OpenRigs.Video"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:io="clr-namespace:Bonsai.IO;assembly=Bonsai.System"
                  xmlns:gl="clr-namespace:Bonsai.Shaders;assembly=Bonsai.Shaders"
                  xmlns:res="clr-namespace:Bonsai.Resources;assembly=Bonsai.System"
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The pre-training preflight (PROTOTYPE), run from rig-control's Preflight card. Ready mode: every device this machine's rig.yml declares is opened and kept open until Stop, its rate reported once a second as the devices metric; the Pulse command pulses a behaviour board line. Go counts each device in turn (step metric), asks the person about each device that needs it (prompt metric, answered by Confirm), writes the raw rows (Device,Measure,Value,Detail) to RawFile and reports Finished. coen_qc_preflight_rig.judge applies the thresholds.</Description>
+  <Description>The pre-training preflight (PROTOTYPE), run from rig-control's Preflight card. Ready mode: every device this machine's rig.yml declares is opened and kept open until Stop, its rate reported once a second as the devices metric; a behaviour board with trigger 0 enabled triggers the cameras (OpenRigs.Video TriggeredSpinnaker with rig.yml's exposure, gain, binning and pixelFormat, Mono8 when not set) at its frequency; the Pulse command pulses a behaviour board line. Go counts each device in turn (step metric), asks the person about each device that needs it (prompt metric, answered by Confirm), writes the raw rows (Device,Measure,Value,Detail) to RawFile and reports Finished. coen_qc_preflight_rig.judge applies the thresholds.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -123,10 +124,11 @@
                       <Property Name="Device" Selector="Name" />
                       <Property Name="Kind" Selector="Kind" />
                       <Property Name="PulseWidths" Selector="PulseWidths" />
+                      <Property Name="Trigger0Frequency" Selector="Trigger0Frequency" />
                     </PropertyMappings>
                   </Expression>
                   <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="p1:BoardPulses" />
+                    <Combinator xsi:type="p1:BoardWrites" />
                   </Expression>
                   <Expression xsi:type="SubscribeSubject">
                     <Name>HarpEntry</Name>
@@ -209,13 +211,21 @@
                   <Expression xsi:type="PropertyMapping">
                     <PropertyMappings>
                       <Property Name="SerialNumber" Selector="SerialNumber" />
+                      <Property Name="ExposureTime" Selector="ExposureTime" />
+                      <Property Name="Gain" Selector="Gain" />
+                      <Property Name="Binning" Selector="Binning" />
+                      <Property Name="PixelFormat" Selector="PixelFormat" />
                     </PropertyMappings>
                   </Expression>
                   <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="spk:SpinnakerCapture">
+                    <Combinator xsi:type="vid:TriggeredSpinnaker">
                       <spk:Index xsi:nil="true" />
                       <spk:SerialNumber />
                       <spk:ColorProcessing>Default</spk:ColorProcessing>
+                      <vid:ExposureTime>19000</vid:ExposureTime>
+                      <vid:Gain>0</vid:Gain>
+                      <vid:Binning>1</vid:Binning>
+                      <vid:PixelFormat>Mono8</vid:PixelFormat>
                     </Combinator>
                   </Expression>
                   <Expression xsi:type="SubscribeSubject">

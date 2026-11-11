@@ -9,8 +9,8 @@ The Coen Lab's pre-training preflight: one Bonsai workflow for every rig, checki
 Run from rig-control's Preflight card through `OpenRigs.Control`'s `ExperimentControl` (port 5561, no parameters). `src\main.bonsai`, in groups:
 
 - **Devices**: `PreflightDevices` (`src\Extensions\Preflight.cs`) reads `<ConfigRoot>\<MACHINE>\rig.yml` as lib-open-rigs' `RigDevices` does. One `SelectMany` per family opens each entry and keeps it open until Stop:
-  - Harp boards (`behaviorBoard`, `timestampGeneratorGen3`, `stepperDriver`, `licketySplit`): `harp:Device` on `portName`, messages counted.
-  - Cameras: `SpinnakerCapture` by `serialNumber`, frames counted.
+  - Harp boards (`behaviorBoard`, `timestampGeneratorGen3`, `stepperDriver`, `licketySplit`): `harp:Device` on `portName`, messages counted. A behaviour board with `cameraTriggerController.trigger0Enabled` starts camera trigger 0 (DO0) at `trigger0Frequency` when it opens (`BoardWrites`); the board stops it itself on going to Standby when the workflow stops.
+  - Cameras: OpenRigs.Video's `TriggeredSpinnaker` by `serialNumber`, as the experiments open them (hardware triggered, rig.yml's `exposureTime`, `gain`, `binning` and `pixelFormat`, Mono8 when not set), frames counted. With no trigger running a camera sends nothing.
   - `projectionCalibration`: the projector's window with the rig's mesh map and gamma lookup and a test pattern, frames rendered counted; closed once its `Confirm` comes after Go (the render chain first, on its own thread: see the annotation).
   - `speakerArray`: nothing opened; only the person's answer.
   `DeviceMonitor` reports what each device sent every second, or its error once, so one dead device never ends the run.
