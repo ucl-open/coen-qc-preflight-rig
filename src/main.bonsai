@@ -52,6 +52,10 @@
                   <Description>Steps on a stepper driver motor its rig.yml wiring names, from where it is: the text is the driver, motor and steps, such as StepperDriver-A Motor1 -150.</Description>
                 </Command>
                 <Command>
+                  <Name>Home</Name>
+                  <Description>Zeroes a stepper driver motor as av-dome does: off its home switch if on it, then towards zero until the switch stops it, then its position set to 0. The text is the driver and motor, such as StepperDriver-A Motor1; only a motor whose motor and input rig.yml's wiring names.</Description>
+                </Command>
+                <Command>
                   <Name>Confirm</Name>
                   <Description>The person's answer for a device the check asks about, after Go: the text is the device and yes or no, such as SpeakerArray yes.</Description>
                 </Command>
@@ -192,6 +196,14 @@
                       <orcl:Name>Move</orcl:Name>
                     </Combinator>
                   </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>ControlEvents</Name>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="orcl:OnCommand">
+                      <orcl:Name>Home</orcl:Name>
+                    </Combinator>
+                  </Expression>
                 </Nodes>
                 <Edges>
                   <Edge From="0" To="1" Label="Source1" />
@@ -199,6 +211,8 @@
                   <Edge From="3" To="6" Label="Source1" />
                   <Edge From="16" To="17" Label="Source1" />
                   <Edge From="17" To="6" Label="Source3" />
+                  <Edge From="18" To="19" Label="Source1" />
+                  <Edge From="19" To="6" Label="Source4" />
                   <Edge From="4" To="5" Label="Source1" />
                   <Edge From="5" To="6" Label="Source2" />
                   <Edge From="6" To="9" Label="Source1" />

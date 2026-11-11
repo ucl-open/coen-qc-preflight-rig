@@ -11,6 +11,7 @@ using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 using Bonsai;
 using Bonsai.Harp;
 using YamlDotNet.RepresentationModel;
@@ -707,13 +708,16 @@ public class BoardWrites
     const int InterlockEnabled = 72;
     const int AccumulatedStepsSamplingRate = 73;
     const int Motor0MoveRelative = 81;
+    const int DigitalInputState = 78;
+    const int Motor0AccumulatedSteps = 91;
+    const int StopMotors = 110;
 
-    /// <summary>The board's writes when it opens, then those for each Pulse command (a behaviour board) or Move command (a stepper driver) to it.</summary>
-    public IObservable<HarpMessage> Process(IObservable<string> pulses, IObservable<string> moves)
+    /// <summary>The board's writes when it opens, then those for each Pulse command (a behaviour board), or Move and Home command (a stepper driver), to it.</summary>
+    public IObservable<HarpMessage> Process(IObservable<string> pulses, IObservable<string> moves, IObservable<string> homes)
     {
         return Observable.Defer(() =>
         {
-            if (Kind == "stepperDriver") return Stepper().ToObservable().Concat(Moves(moves));
+            if (Kind == "stepperDriver") return Stepper().ToObservable().Concat(Moves(moves).Merge(Homes(homes)));
             var board = Kind == "behaviorBoard";
             var start = new List<HarpMessage>();
             if (board && RunningWheel)
@@ -780,6 +784,85 @@ public class BoardWrites
                 return Observable.Empty<HarpMessage>();
             }
             return Observable.Return(HarpMessage.FromInt32(Motor0MoveRelative + n, MessageType.Write, steps));
+        });
+    }
+
+    // The driver's digital inputs as it last said them (DigitalInputState bits, Input0 = 1); -1 before it has.
+    class Inputs
+    {
+        public int Bits = -1;
+    }
+
+    // Home <Device> <Motor>, such as StepperDriver-A Motor1: as av-dome zeroes a motor (ZEROingMotors.bonsai). Off its
+    // home switch first if on it (1000 steps at a time), then towards zero until the switch stops it
+    // (StopMotor<n>OnFalling, set at open), then its position set to 0. Only a motor whose input the wiring names too.
+    IObservable<HarpMessage> Homes(IObservable<string> homes)
+    {
+        var name = Device;
+        var wired = WiredMotors & WiredInputs;
+        return Observable.Create<HarpMessage>(observer =>
+        {
+            var inputs = new Inputs();
+            var watch = DeviceHub<HarpMessage>.Items
+                .Where(item => item.Item1 == name && item.Item2.Address == DigitalInputState && item.Item2.MessageType != MessageType.Write)
+                .Subscribe(item => Volatile.Write(ref inputs.Bits, item.Item2.GetPayloadByte()));
+            var runs = homes.SelectMany(text =>
+            {
+                var parts = (text ?? string.Empty).Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length != 2 || parts[0] != name) return Observable.Empty<HarpMessage>();
+                int n;
+                var motor = parts[1].ToLowerInvariant();
+                if (!motor.StartsWith("motor") || !int.TryParse(motor.Substring(5), out n) || n < 0 || n > 3 || (wired & (1 << n)) == 0)
+                {
+                    Console.Error.WriteLine("preflight: Home '" + text + "' ignored: give the driver and a motor whose motor and input its wiring names");
+                    return Observable.Empty<HarpMessage>();
+                }
+                return Home(name, n, inputs);
+            }).Subscribe(observer);
+            return new CompositeDisposable(watch, runs);
+        });
+    }
+
+    static IObservable<HarpMessage> Home(string device, int n, Inputs inputs)
+    {
+        return Observable.Create<HarpMessage>(async (observer, token) =>
+        {
+            var bit = 1 << n;
+            Func<int> bits = () => Volatile.Read(ref inputs.Bits);
+            var clock = Stopwatch.StartNew();
+            // Asked, as av-dome asks for them at start: the first state may have come before this listened.
+            if (bits() < 0) observer.OnNext(HarpMessage.FromByte(DigitalInputState, MessageType.Read, 0));
+            while (bits() < 0 && clock.Elapsed < TimeSpan.FromSeconds(2)) await Task.Delay(50, token);
+            if (bits() < 0)
+            {
+                Console.Error.WriteLine("preflight: " + device + " Motor" + n + " not homed: the driver has not said its inputs");
+                return;
+            }
+            for (var i = 0; i < 10 && (bits() & bit) == 0; i++)
+            {
+                observer.OnNext(HarpMessage.FromInt32(Motor0MoveRelative + n, MessageType.Write, 1000));
+                await Task.Delay(1000, token);
+            }
+            if ((bits() & bit) == 0)
+            {
+                Console.Error.WriteLine("preflight: " + device + " Motor" + n + " not homed: still on its home switch after 10000 steps off it");
+                return;
+            }
+            observer.OnNext(HarpMessage.FromInt32(Motor0MoveRelative + n, MessageType.Write, -100000));
+            clock.Restart();
+            while ((bits() & bit) != 0)
+            {
+                if (clock.Elapsed > TimeSpan.FromSeconds(60))
+                {
+                    observer.OnNext(HarpMessage.FromByte(StopMotors, MessageType.Write, (byte)bit));
+                    Console.Error.WriteLine("preflight: " + device + " Motor" + n + " not homed: its home switch was not reached in 60 s, so it was stopped");
+                    return;
+                }
+                await Task.Delay(20, token);
+            }
+            await Task.Delay(200, token);
+            observer.OnNext(HarpMessage.FromInt32(Motor0AccumulatedSteps + n, MessageType.Write, 0));
+            Console.Error.WriteLine("preflight: " + device + " Motor" + n + " homed");
         });
     }
 
