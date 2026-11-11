@@ -31,8 +31,6 @@ uv run --project <rig-control> rig-control status|go|command|stop localhost --po
 
 - A test sound for the speaker question: the workflow asks it but plays nothing.
 - Other checks a person confirms (a drop seen at each reward valve, the wheel turned and counted).
-- The behaviour board starting its camera trigger, without which a triggered camera counts no frames.
-- Live view: OpenRigs.LiveView's `StreamDevices` streams only `<Device>.Data` subjects it finds by name when the workflow is built, and these devices are opened per rig.yml entry inside `SelectMany`s, whose subjects it cannot see. It needs a mode that takes devices at run time (such as one subject of named items, or a per-device node inside the branch).
 - A Stop before the projector's `Confirm` tears its window down from the control server's thread.
 - Thresholds set on a rig.
 - rig-setup's Repos, which also puts it under lib-open-rigs' update-workflows; until then its `local_packages` are the lab's as of 7 Nov 2026.

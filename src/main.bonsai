@@ -722,9 +722,41 @@
       <Expression xsi:type="rx:PublishSubject">
         <Name>Camera-Body.Data</Name>
       </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="p1:HarpDeviceData">
+          <p1:Device>LicketySplit-Left</p1:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name>LicketySplit-Left.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="p1:HarpDeviceData">
+          <p1:Device>LicketySplit-Right</p1:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name>LicketySplit-Right.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="p1:HarpDeviceData">
+          <p1:Device>StepperDriver-A</p1:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name>StepperDriver-A.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="p1:HarpDeviceData">
+          <p1:Device>StepperDriver-B</p1:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name>StepperDriver-B.Data</Name>
+      </Expression>
       <Expression xsi:type="lv:StreamDevices">
         <Name>LiveView</Name>
-        <Description>Streams this rig's Behavior board and cameras to rig-control's live view (OpenRigs.LiveView): data on TCP 5556, video on 5558, as av-dome does. Their &lt;Device&gt;.Data subjects come from the branches through ShareDeviceData, one per name the lab's workflows use (BehaviorBoard-Main, Camera-Face, Camera-Pupil, Camera-Body; av-dome's RigDevice names, 11 Nov 2026). No experiment folder, so the session key stays ready. Last in the workflow: it finds only subjects built before it.</Description>
+        <Description>Streams this rig's Behavior board, Lickety Splits, stepper drivers and cameras to rig-control's live view (OpenRigs.LiveView): data on TCP 5556, video on 5558, as av-dome does. Their &lt;Device&gt;.Data subjects come from the branches through ShareDeviceData, one per name the lab's workflows use (BehaviorBoard-Main, LicketySplit-Left, LicketySplit-Right, StepperDriver-A, StepperDriver-B, Camera-Face, Camera-Pupil, Camera-Body; av-dome's RigDevice names, 11 Nov 2026). No experiment folder, so the session key stays ready. Last in the workflow: it finds only subjects built before it.</Description>
         <lv:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</lv:ConfigRoot>
         <lv:DataPort>5556</lv:DataPort>
         <lv:VideoPort>5558</lv:VideoPort>
@@ -738,6 +770,10 @@
       <Edge From="9" To="10" Label="Source1" />
       <Edge From="11" To="12" Label="Source1" />
       <Edge From="13" To="14" Label="Source1" />
+      <Edge From="15" To="16" Label="Source1" />
+      <Edge From="17" To="18" Label="Source1" />
+      <Edge From="19" To="20" Label="Source1" />
+      <Edge From="21" To="22" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>
