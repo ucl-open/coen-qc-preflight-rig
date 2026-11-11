@@ -515,7 +515,7 @@
       </Expression>
       <Expression xsi:type="GroupWorkflow">
         <Name>Ready</Name>
-        <Description>Once every device has opened or failed: Ready, and from then the devices metric once a second.</Description>
+        <Description>Once every device has opened or failed: Ready, and from then the devices metric once a second. Take(1) is a branch of its own off DeviceRates, so the metric goes on after Ready; after ReportMetric it ended the metric at its first report (the first second after opening, stale ever after).</Description>
         <Workflow>
           <Nodes>
             <Expression xsi:type="SubscribeSubject">
@@ -549,7 +549,7 @@
             <Edge From="0" To="2" Label="Source1" />
             <Edge From="1" To="2" Label="Source2" />
             <Edge From="2" To="3" Label="Source1" />
-            <Edge From="3" To="4" Label="Source1" />
+            <Edge From="2" To="4" Label="Source1" />
             <Edge From="4" To="5" Label="Source1" />
           </Edges>
         </Workflow>
