@@ -126,6 +126,7 @@
                       <Property Name="Kind" Selector="Kind" />
                       <Property Name="PulseWidths" Selector="PulseWidths" />
                       <Property Name="Trigger0Frequency" Selector="Trigger0Frequency" />
+                      <Property Name="RunningWheel" Selector="RunningWheel" />
                     </PropertyMappings>
                   </Expression>
                   <Expression xsi:type="Combinator">

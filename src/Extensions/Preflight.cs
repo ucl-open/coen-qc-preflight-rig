@@ -41,6 +41,8 @@ public class PreflightDevice
     public string PulseWidths { get; set; }
     /// <summary>A behaviour board's cameraTriggerController trigger0Frequency in Hz; 0 when trigger 0 is not enabled, and elsewhere.</summary>
     public int Trigger0Frequency { get; set; }
+    /// <summary>A behaviour board with a runningWheel in rig.yml: its encoder on Port 2 is enabled.</summary>
+    public bool RunningWheel { get; set; }
     /// <summary>A camera's exposureTime in microseconds, else 19000.</summary>
     public double ExposureTime { get; set; }
     /// <summary>A camera's gain, else 0.</summary>
@@ -201,6 +203,7 @@ public class PreflightDevices
         var trigger = Child(settings, "cameraTriggerController");
         if (Setting(trigger, "trigger0Enabled").ToLowerInvariant() == "true")
             device.Trigger0Frequency = (int)Number(trigger, "trigger0Frequency", 50);
+        device.RunningWheel = Child(settings, "runningWheel") != null;
         device.ExposureTime = Number(settings, "exposureTime", 19000);
         device.Gain = Number(settings, "gain", 0);
         device.Binning = (int)Number(settings, "binning", 1);
@@ -637,6 +640,12 @@ public class BoardWrites
     // Harp.Behavior's device.yml: StartCameras (U8, CameraOutput0 = 1) and Camera0Frequency (U16, Hz).
     const int StartCameras = 78;
     const int Camera0Frequency = 93;
+    // The running wheel, as OpenRigs.Devices' BehaviorBoard.RunningWheel writes it: EnableEncoders
+    // (U8, EncoderPort2 = 4), EncoderMode (U8, Position = 0), EncoderReset (U8, EncoderPort2 = 4).
+    const int EnableEncoders = 82;
+    const int EncoderMode = 83;
+    const int EncoderReset = 108;
+    const byte EncoderPort2 = 4;
 
     /// <summary>The board's name.</summary>
     public string Device { get; set; }
@@ -646,20 +655,27 @@ public class BoardWrites
     public string PulseWidths { get; set; }
     /// <summary>Camera trigger 0's frequency in Hz; 0 leaves the trigger alone.</summary>
     public int Trigger0Frequency { get; set; }
+    /// <summary>rig.yml has a runningWheel for this board: its encoder is enabled, in Position mode, and reset.</summary>
+    public bool RunningWheel { get; set; }
 
-    /// <summary>The trigger writes when the board opens, then the writes for each Pulse command to this board.</summary>
+    /// <summary>The trigger and encoder writes when the board opens, then the writes for each Pulse command to this board.</summary>
     public IObservable<HarpMessage> Process(IObservable<string> commands)
     {
         return Observable.Defer(() =>
         {
             var board = Kind == "behaviorBoard";
-            var start = board && Trigger0Frequency > 0
-                ? new[]
-                {
-                    HarpMessage.FromUInt16(Camera0Frequency, MessageType.Write, (ushort)Trigger0Frequency),
-                    HarpMessage.FromByte(StartCameras, MessageType.Write, 1),
-                }
-                : new HarpMessage[0];
+            var start = new List<HarpMessage>();
+            if (board && RunningWheel)
+            {
+                start.Add(HarpMessage.FromByte(EnableEncoders, MessageType.Write, EncoderPort2));
+                start.Add(HarpMessage.FromByte(EncoderMode, MessageType.Write, 0));
+                start.Add(HarpMessage.FromByte(EncoderReset, MessageType.Write, EncoderPort2));
+            }
+            if (board && Trigger0Frequency > 0)
+            {
+                start.Add(HarpMessage.FromUInt16(Camera0Frequency, MessageType.Write, (ushort)Trigger0Frequency));
+                start.Add(HarpMessage.FromByte(StartCameras, MessageType.Write, 1));
+            }
             return start.ToObservable().Concat(Pulses(commands, board));
         });
     }
