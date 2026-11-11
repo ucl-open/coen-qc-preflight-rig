@@ -45,7 +45,7 @@
               <Commands>
                 <Command>
                   <Name>Pulse</Name>
-                  <Description>One pulse on a behaviour board line: the text is the board and line, such as BehaviorBoard-Main DO1. Its length is the line's pulseWidthMs in rig.yml, else 50 ms, or a width in ms given third, 1 to 60000 (BehaviorBoard-Main DO1 10000: rig-control's Flush, a valve open 10 s).</Description>
+                  <Description>One pulse on a behaviour board line: the text is the board and line, such as BehaviorBoard-Main DO1. Its length is the line's pulseWidthMs in rig.yml, else 50 ms, or a width in ms given third, 1 to 60000 (BehaviorBoard-Main DO1 10000: rig-control's Flush, a valve open 10 s). On DO0 to DO3 the board times it, so it ends even if the workflow stops.</Description>
                 </Command>
                 <Command>
                   <Name>Move</Name>

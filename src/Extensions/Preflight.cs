@@ -652,11 +652,12 @@ public class CloseWhen
 /// <summary>
 /// A behaviour board's writes. When the board opens, with trigger 0 enabled in rig.yml: camera trigger 0
 /// at its frequency, then started, so the cameras get frames. The board stops it itself when Device
-/// closes it at Stop, as the firmware stops both camera outputs on going to Standby. Then for each Pulse
-/// command (Device Line, such as BehaviorBoard-Main DO1): the line set, then cleared after its
-/// pulseWidthMs in rig.yml, else 50 ms, or after the width given third (BehaviorBoard-Main DO1 10000,
-/// rig-control's Flush). Other devices' commands, and any board that is not a behaviour
-/// board, give nothing.
+/// closes it at Stop, as the firmware stops both camera outputs on going to Standby. OutputPulseEnable
+/// is cleared as it opens. Then for each Pulse command (Device Line, such as BehaviorBoard-Main DO1): a
+/// pulse of the line's pulseWidthMs in rig.yml, else 50 ms, or of the width given third
+/// (BehaviorBoard-Main DO1 10000, rig-control's Flush), timed by the board on DO0 to DO3 (so it ends
+/// even if the workflow stops) and from here on DOPort0 to DOPort2. Other devices' commands, and any
+/// board that is not a behaviour board, give nothing.
 /// </summary>
 [Combinator]
 [WorkflowElementCategory(ElementCategory.Transform)]
@@ -665,6 +666,9 @@ public class BoardWrites
 {
     const int OutputSet = 34;
     const int OutputClear = 35;
+    // Harp.Behavior's OutputPulseEnable (U16 DigitalOutputs) and PulseDO0 to PulseDO3 (U16 ms, 56 to 59).
+    const int OutputPulseEnable = 45;
+    const int PulseDO0 = 56;
     // Harp.Behavior's device.yml: StartCameras (U8, CameraOutput0 = 1) and Camera0Frequency (U16, Hz).
     const int StartCameras = 78;
     const int Camera0Frequency = 93;
@@ -727,6 +731,8 @@ public class BoardWrites
                 start.Add(HarpMessage.FromByte(EncoderMode, MessageType.Write, 0));
                 start.Add(HarpMessage.FromByte(EncoderReset, MessageType.Write, EncoderPort2));
             }
+            // No line pulses until this run writes its width (an experiment leaves DO1 to DO3 enabled).
+            if (board) start.Add(HarpMessage.FromUInt16(OutputPulseEnable, MessageType.Write, 0));
             if (board && Trigger0Frequency > 0)
             {
                 start.Add(HarpMessage.FromUInt16(Camera0Frequency, MessageType.Write, (ushort)Trigger0Frequency));
@@ -867,6 +873,11 @@ public class BoardWrites
         });
     }
 
+    // A DO line's pulse timed by the board itself (audit, 11 Nov 2026): its PulseDO<n> width, the line in
+    // OutputPulseEnable, then OutputSet, as OpenRigs.Devices PulseController's calibrated pulse fires one.
+    // Experiments leave OutputPulseEnable set with a reward's width, so a line set and cleared from the PC
+    // gave that width instead (Flush, one drop); and a pulse timed here closes even if the workflow stops
+    // mid-pulse, where a clear sent from the PC never came.
     IObservable<HarpMessage> Pulses(IObservable<string> commands, bool board)
     {
         var name = Device;
@@ -877,10 +888,16 @@ public class BoardWrites
             double ms;
             if (cut > 0 && double.TryParse(pair.Substring(cut + 1), NumberStyles.Float, Preflight.Invariant, out ms)) widths[pair.Substring(0, cut).Trim()] = ms;
         }
+        ushort enabled = 0;  // the DO lines this run has pulsed, each with its width written
         return commands.SelectMany(text =>
         {
             var parts = (text ?? string.Empty).Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            if (!board || parts.Length < 2 || parts.Length > 3 || parts[0] != name) return Observable.Empty<HarpMessage>();
+            if (!board || parts.Length == 0 || parts[0] != name) return Observable.Empty<HarpMessage>();
+            if (parts.Length < 2 || parts.Length > 3)
+            {
+                Console.Error.WriteLine("preflight: Pulse '" + text + "' ignored: give the board, the line and, optionally, a width in ms");
+                return Observable.Empty<HarpMessage>();
+            }
             var mask = Mask(parts[1]);
             if (mask == 0)
             {
@@ -898,6 +915,16 @@ public class BoardWrites
                 }
             }
             else if (!widths.TryGetValue(parts[1], out ms)) ms = 50;
+            if (mask >= 0x400)
+            {
+                var n = 0;
+                while ((0x400 << n) != mask) n++;
+                enabled |= mask;
+                return Observable.Return(HarpMessage.FromUInt16(PulseDO0 + n, MessageType.Write, (ushort)Math.Max(1, Math.Min(65535, Math.Round(ms)))))
+                    .Concat(Observable.Return(HarpMessage.FromUInt16(OutputPulseEnable, MessageType.Write, enabled)))
+                    .Concat(Observable.Return(HarpMessage.FromUInt16(OutputSet, MessageType.Write, mask)));
+            }
+            // A DOPort line has no pulse register: set, then cleared from here.
             return Observable.Return(HarpMessage.FromUInt16(OutputSet, MessageType.Write, mask))
                 .Concat(Observable.Timer(TimeSpan.FromMilliseconds(ms)).Select(_ => HarpMessage.FromUInt16(OutputClear, MessageType.Write, mask)));
         });
