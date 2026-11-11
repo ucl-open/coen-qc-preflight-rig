@@ -654,7 +654,8 @@ public class CloseWhen
 /// at its frequency, then started, so the cameras get frames. The board stops it itself when Device
 /// closes it at Stop, as the firmware stops both camera outputs on going to Standby. Then for each Pulse
 /// command (Device Line, such as BehaviorBoard-Main DO1): the line set, then cleared after its
-/// pulseWidthMs in rig.yml, else 50 ms. Other devices' commands, and any board that is not a behaviour
+/// pulseWidthMs in rig.yml, else 50 ms, or after the width given third (BehaviorBoard-Main DO1 10000,
+/// rig-control's Flush). Other devices' commands, and any board that is not a behaviour
 /// board, give nothing.
 /// </summary>
 [Combinator]
@@ -879,7 +880,7 @@ public class BoardWrites
         return commands.SelectMany(text =>
         {
             var parts = (text ?? string.Empty).Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            if (!board || parts.Length != 2 || parts[0] != name) return Observable.Empty<HarpMessage>();
+            if (!board || parts.Length < 2 || parts.Length > 3 || parts[0] != name) return Observable.Empty<HarpMessage>();
             var mask = Mask(parts[1]);
             if (mask == 0)
             {
@@ -887,7 +888,16 @@ public class BoardWrites
                 return Observable.Empty<HarpMessage>();
             }
             double ms;
-            if (!widths.TryGetValue(parts[1], out ms)) ms = 50;
+            if (parts.Length == 3)
+            {
+                // A width given with the line (Pip, 11 Nov 2026: Flush, a valve open 10 s): 1 ms to 60 s.
+                if (!double.TryParse(parts[2], NumberStyles.Float, Preflight.Invariant, out ms) || ms < 1 || ms > 60000)
+                {
+                    Console.Error.WriteLine("preflight: Pulse '" + text + "' ignored: the width is 1 to 60000 ms");
+                    return Observable.Empty<HarpMessage>();
+                }
+            }
+            else if (!widths.TryGetValue(parts[1], out ms)) ms = 50;
             return Observable.Return(HarpMessage.FromUInt16(OutputSet, MessageType.Write, mask))
                 .Concat(Observable.Timer(TimeSpan.FromMilliseconds(ms)).Select(_ => HarpMessage.FromUInt16(OutputClear, MessageType.Write, mask)));
         });
