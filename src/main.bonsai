@@ -8,358 +8,663 @@
                  xmlns:io="clr-namespace:Bonsai.IO;assembly=Bonsai.System"
                  xmlns:gl="clr-namespace:Bonsai.Shaders;assembly=Bonsai.Shaders"
                  xmlns:res="clr-namespace:Bonsai.Resources;assembly=Bonsai.System"
+                 xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The pre-training preflight (PROTOTYPE). Which devices it checks comes from this machine's rig.yml: each SelectMany starts one branch per entry PreflightDevices lists, and nothing for a kind the rig does not declare. Each branch writes raw rows (Device,Measure,Value,Detail); coen_qc_preflight_rig.judge applies the thresholds.</Description>
+  <Description>The pre-training preflight (PROTOTYPE), run from rig-control's Preflight card. Ready mode: every device this machine's rig.yml declares is opened and kept open until Stop, its rate reported once a second as the devices metric; the Pulse command pulses a behaviour board line. Go counts each device in turn (step metric), asks the person about each device that needs it (prompt metric, answered by Confirm), writes the raw rows (Device,Measure,Value,Detail) to RawFile and reports Finished. coen_qc_preflight_rig.judge applies the thresholds.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="ConfigRoot" Description="The folder holding &lt;MACHINE&gt;\rig.yml; a launch property." />
+        <Property Name="ProjectionWindowState" Description="Fullscreen on a rig; Normal for a test on a desk." />
+        <Property Name="ProjectionWidth" />
+        <Property Name="ProjectionHeight" />
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="FileName" DisplayName="RawFile" Description="Where the raw rows go; a launch property." />
+        <Property Name="RawFile" Description="Where the raw rows go; a launch property." />
       </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="p1:PreflightDevices">
-          <p1:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</p1:ConfigRoot>
-          <p1:Kinds>behaviorBoard,timestampGeneratorGen3,stepperDriver,licketySplit</p1:Kinds>
-        </Combinator>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="SubjectId" />
+        <Property Name="SessionId" />
       </Expression>
-      <Expression xsi:type="rx:SelectMany">
-        <Name>Check Harp Boards</Name>
+      <Expression xsi:type="GroupWorkflow">
+        <Name>Initialization</Name>
+        <Description>The experiment controller (OpenRigs.Control, ExperimentControl, TCP 5561 on this machine): commands Pulse and Confirm; Recording at Go.</Description>
         <Workflow>
           <Nodes>
-            <Expression xsi:type="WorkflowInput">
-              <Name>Source1</Name>
+            <Expression xsi:type="ExternalizedMapping">
+              <Property Name="SubjectId" />
+              <Property Name="SessionId" />
             </Expression>
-            <Expression xsi:type="rx:AsyncSubject">
-              <Name>HarpEntry</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>HarpEntry</Name>
-            </Expression>
-            <Expression xsi:type="PropertyMapping">
-              <PropertyMappings>
-                <Property Name="PortName" Selector="PortName" />
-              </PropertyMappings>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="harp:Device">
-                <harp:OperationMode>Active</harp:OperationMode>
-                <harp:OperationLed>On</harp:OperationLed>
-                <harp:DumpRegisters>true</harp:DumpRegisters>
-                <harp:VisualIndicators>On</harp:VisualIndicators>
-                <harp:Heartbeat>Enabled</harp:Heartbeat>
-                <harp:IgnoreErrors>false</harp:IgnoreErrors>
-                <harp:PortName />
-              </Combinator>
+            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Control:ExperimentControl.bonsai">
+              <SubjectId />
+              <SessionId />
+              <ControlEndpoint>@tcp://127.0.0.1:5561</ControlEndpoint>
+              <Parameters />
+              <Commands>
+                <Command>
+                  <Name>Pulse</Name>
+                  <Description>One pulse on a behaviour board line: the text is the board and line, such as BehaviorBoard-Main DO1. Its length is the line's pulseWidthMs in rig.yml, else 50 ms.</Description>
+                </Command>
+                <Command>
+                  <Name>Confirm</Name>
+                  <Description>The person's answer for a device the check asks about, after Go: the text is the device and yes or no, such as SpeakerArray yes.</Description>
+                </Command>
+              </Commands>
             </Expression>
             <Expression xsi:type="SubscribeSubject">
-              <Name>HarpEntry</Name>
-            </Expression>
-            <Expression xsi:type="PropertyMapping">
-              <PropertyMappings>
-                <Property Name="Device" Selector="Name" />
-              </PropertyMappings>
+              <Name>ExperimentGo</Name>
             </Expression>
             <Expression xsi:type="Combinator">
-              <Combinator xsi:type="p1:CheckDevice">
-                <p1:Measure>messages</p1:Measure>
-                <p1:Warmup>1</p1:Warmup>
-                <p1:Seconds>3</p1:Seconds>
+              <Combinator xsi:type="orcl:ReportPhase">
+                <orcl:Phase>Recording</orcl:Phase>
               </Combinator>
             </Expression>
-            <Expression xsi:type="WorkflowOutput" />
           </Nodes>
           <Edges>
             <Edge From="0" To="1" Label="Source1" />
             <Edge From="2" To="3" Label="Source1" />
-            <Edge From="3" To="4" Label="Source1" />
-            <Edge From="4" To="7" Label="Source1" />
-            <Edge From="5" To="6" Label="Source1" />
-            <Edge From="6" To="7" Label="Source2" />
-            <Edge From="7" To="8" Label="Source1" />
           </Edges>
         </Workflow>
       </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="p1:PreflightDevices">
-          <p1:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</p1:ConfigRoot>
-          <p1:Kinds>camera</p1:Kinds>
-        </Combinator>
-      </Expression>
-      <Expression xsi:type="rx:SelectMany">
-        <Name>Check Cameras</Name>
+      <Expression xsi:type="GroupWorkflow">
+        <Name>Devices</Name>
+        <Description>Devices lists every entry the check covers, in rig.yml's order. Each SelectMany opens one branch per entry of its family and keeps the device open until Stop; DeviceMonitor reports what each sent every second, or its error, as DeviceReports.</Description>
         <Workflow>
           <Nodes>
-            <Expression xsi:type="WorkflowInput">
-              <Name>Source1</Name>
-            </Expression>
-            <Expression xsi:type="rx:AsyncSubject">
-              <Name>CameraEntry</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>CameraEntry</Name>
-            </Expression>
-            <Expression xsi:type="PropertyMapping">
-              <PropertyMappings>
-                <Property Name="SerialNumber" Selector="SerialNumber" />
-              </PropertyMappings>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="spk:SpinnakerCapture">
-                <spk:Index xsi:nil="true" />
-                <spk:SerialNumber />
-                <spk:ColorProcessing>Default</spk:ColorProcessing>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>CameraEntry</Name>
-            </Expression>
-            <Expression xsi:type="PropertyMapping">
-              <PropertyMappings>
-                <Property Name="Device" Selector="Name" />
-              </PropertyMappings>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="p1:CheckDevice">
-                <p1:Measure>frames</p1:Measure>
-                <p1:Warmup>2</p1:Warmup>
-                <p1:Seconds>5</p1:Seconds>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="WorkflowOutput" />
-          </Nodes>
-          <Edges>
-            <Edge From="0" To="1" Label="Source1" />
-            <Edge From="2" To="3" Label="Source1" />
-            <Edge From="3" To="4" Label="Source1" />
-            <Edge From="4" To="7" Label="Source1" />
-            <Edge From="5" To="6" Label="Source1" />
-            <Edge From="6" To="7" Label="Source2" />
-            <Edge From="7" To="8" Label="Source1" />
-          </Edges>
-        </Workflow>
-      </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="rx:Merge" />
-      </Expression>
-      <Expression xsi:type="io:CsvWriter">
-        <io:FileName>preflight-raw.csv</io:FileName>
-        <io:Append>false</io:Append>
-        <io:Overwrite>true</io:Overwrite>
-        <io:Suffix>None</io:Suffix>
-        <io:IncludeHeader>true</io:IncludeHeader>
-        <io:Selector />
-      </Expression>
-      <Expression xsi:type="WorkflowOutput" />
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="p1:PreflightDevices">
-          <p1:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</p1:ConfigRoot>
-          <p1:Kinds>projectionCalibration</p1:Kinds>
-        </Combinator>
-      </Expression>
-      <Expression xsi:type="ExternalizedMapping">
-        <Property Name="WindowState" DisplayName="ProjectionWindowState" Description="Fullscreen on a rig; Normal for a test on a desk." />
-        <Property Name="Width" DisplayName="ProjectionWidth" />
-        <Property Name="Height" DisplayName="ProjectionHeight" />
-      </Expression>
-      <Expression xsi:type="rx:SelectMany">
-        <Name>Check Projection</Name>
-        <Description>Only for a rig whose rig.yml has projectionCalibration: opens the projector's window, loads the rig's mesh map and gamma lookup, draws a test pattern and counts the frames rendered.</Description>
-        <Workflow>
-          <Nodes>
-            <Expression xsi:type="WorkflowInput">
-              <Name>Source1</Name>
-            </Expression>
-            <Expression xsi:type="rx:AsyncSubject">
-              <Name>ProjectionEntry</Name>
+            <Expression xsi:type="ExternalizedMapping">
+              <Property Name="ConfigRoot" />
             </Expression>
             <Expression xsi:type="ExternalizedMapping">
-              <Property Name="WindowState" />
-              <Property Name="Width" />
-              <Property Name="Height" />
+              <Property Name="WindowState" DisplayName="ProjectionWindowState" />
+              <Property Name="Width" DisplayName="ProjectionWidth" />
+              <Property Name="Height" DisplayName="ProjectionHeight" />
             </Expression>
             <Expression xsi:type="Combinator">
-              <Combinator xsi:type="gl:CreateWindow">
-                <gl:Width>1920</gl:Width>
-                <gl:Height>1080</gl:Height>
-                <gl:VSync>On</gl:VSync>
-                <gl:SwapSync>false</gl:SwapSync>
-                <gl:ClearColor>Gray</gl:ClearColor>
-                <gl:ClearMask>DepthBufferBit ColorBufferBit</gl:ClearMask>
-                <gl:CursorVisible>false</gl:CursorVisible>
-                <gl:Location xsi:nil="true" />
-                <gl:WindowBorder>Fixed</gl:WindowBorder>
-                <gl:WindowState>Fullscreen</gl:WindowState>
-                <gl:DisplayDevice>First</gl:DisplayDevice>
-                <gl:TargetRenderFrequency>60</gl:TargetRenderFrequency>
-                <gl:TargetUpdateFrequency>60</gl:TargetUpdateFrequency>
-                <gl:RenderState />
-                <gl:GraphicsMode>
-                  <gl:ColorFormat>
-                    <gl:Red>8</gl:Red>
-                    <gl:Green>8</gl:Green>
-                    <gl:Blue>8</gl:Blue>
-                    <gl:Alpha>8</gl:Alpha>
-                  </gl:ColorFormat>
-                  <gl:Depth>16</gl:Depth>
-                  <gl:Stencil>0</gl:Stencil>
-                  <gl:Samples>0</gl:Samples>
-                  <gl:AccumulatorFormat>
-                    <gl:Red>0</gl:Red>
-                    <gl:Green>0</gl:Green>
-                    <gl:Blue>0</gl:Blue>
-                    <gl:Alpha>0</gl:Alpha>
-                  </gl:AccumulatorFormat>
-                  <gl:Buffers>2</gl:Buffers>
-                  <gl:Stereo>false</gl:Stereo>
-                </gl:GraphicsMode>
+              <Combinator xsi:type="p1:PreflightDevices">
+                <p1:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</p1:ConfigRoot>
+                <p1:Kinds>behaviorBoard,timestampGeneratorGen3,stepperDriver,licketySplit,camera,speakerArray,projectionCalibration</p1:Kinds>
               </Combinator>
             </Expression>
-            <Expression xsi:type="IncludeWorkflow" Path="BonVision:Primitives.BonVisionResources.bonsai" />
             <Expression xsi:type="Combinator">
-              <Combinator xsi:type="res:LoadResources" />
+              <Combinator xsi:type="rx:ToArray" />
             </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="gl:RenderFrame" />
-            </Expression>
-            <Expression xsi:type="IncludeWorkflow" Path="BonVision:Environment.OrthographicView.bonsai">
-              <Left>-135</Left>
-              <Right>135</Right>
-              <Bottom>-22.5</Bottom>
-              <Top>82.5</Top>
-            </Expression>
-            <Expression xsi:type="rx:BehaviorSubject">
-              <Name>ProjectionDraw</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>ProjectionEntry</Name>
-            </Expression>
-            <Expression xsi:type="PropertyMapping">
-              <PropertyMappings>
-                <Property Name="FileName" Selector="MeshMapPath" />
-              </PropertyMappings>
-            </Expression>
-            <Expression xsi:type="IncludeWorkflow" Path="BonVision:Environment.MeshMapping.bonsai">
-              <ClearColor>Gray</ClearColor>
-              <FileName />
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>ProjectionEntry</Name>
-            </Expression>
-            <Expression xsi:type="PropertyMapping">
-              <PropertyMappings>
-                <Property Name="GammaLut" Selector="GammaLutPath" />
-              </PropertyMappings>
-            </Expression>
-            <Expression xsi:type="IncludeWorkflow" Path="BonVision:Environment.GammaCorrection.bonsai">
-              <ClearColor>Gray</ClearColor>
-              <GammaLut />
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>ProjectionDraw</Name>
-            </Expression>
-            <Expression xsi:type="IncludeWorkflow" Path="BonVision:Primitives.DrawQuad.bonsai">
-              <ExtentX>120</ExtentX>
-              <ExtentY>60</ExtentY>
-              <LocationX>0</LocationX>
-              <LocationY>30</LocationY>
-              <Layer>0</Layer>
-              <Angle>0</Angle>
-              <ColorR>1</ColorR>
-              <ColorG>1</ColorG>
-              <ColorB>1</ColorB>
-              <ColorA>1</ColorA>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>ProjectionEntry</Name>
-            </Expression>
-            <Expression xsi:type="PropertyMapping">
-              <PropertyMappings>
-                <Property Name="Device" Selector="Name" />
-              </PropertyMappings>
+            <Expression xsi:type="rx:AsyncSubject">
+              <Name>Devices</Name>
             </Expression>
             <Expression xsi:type="Combinator">
-              <Combinator xsi:type="p1:CheckDevice">
-                <p1:Measure>frames</p1:Measure>
-                <p1:Warmup>2</p1:Warmup>
-                <p1:Seconds>5</p1:Seconds>
+              <Combinator xsi:type="p1:PreflightDevices">
+                <p1:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</p1:ConfigRoot>
+                <p1:Kinds>behaviorBoard,timestampGeneratorGen3,stepperDriver,licketySplit</p1:Kinds>
               </Combinator>
             </Expression>
-            <Expression xsi:type="WorkflowOutput" />
+            <Expression xsi:type="rx:SelectMany">
+              <Name>Harp Boards</Name>
+              <Workflow>
+                <Nodes>
+                  <Expression xsi:type="WorkflowInput">
+                    <Name>Source1</Name>
+                  </Expression>
+                  <Expression xsi:type="rx:AsyncSubject">
+                    <Name>HarpEntry</Name>
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>ControlEvents</Name>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="orcl:OnCommand">
+                      <orcl:Name>Pulse</orcl:Name>
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>HarpEntry</Name>
+                  </Expression>
+                  <Expression xsi:type="PropertyMapping">
+                    <PropertyMappings>
+                      <Property Name="Device" Selector="Name" />
+                      <Property Name="Kind" Selector="Kind" />
+                      <Property Name="PulseWidths" Selector="PulseWidths" />
+                    </PropertyMappings>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="p1:BoardPulses" />
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>HarpEntry</Name>
+                  </Expression>
+                  <Expression xsi:type="PropertyMapping">
+                    <PropertyMappings>
+                      <Property Name="PortName" Selector="PortName" />
+                    </PropertyMappings>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="harp:Device">
+                      <harp:OperationMode>Active</harp:OperationMode>
+                      <harp:OperationLed>On</harp:OperationLed>
+                      <harp:DumpRegisters>true</harp:DumpRegisters>
+                      <harp:VisualIndicators>On</harp:VisualIndicators>
+                      <harp:Heartbeat>Enabled</harp:Heartbeat>
+                      <harp:IgnoreErrors>false</harp:IgnoreErrors>
+                      <harp:PortName />
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>HarpEntry</Name>
+                  </Expression>
+                  <Expression xsi:type="PropertyMapping">
+                    <PropertyMappings>
+                      <Property Name="Device" Selector="Name" />
+                    </PropertyMappings>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="p1:DeviceMonitor">
+                      <p1:Measure>messages</p1:Measure>
+                      <p1:OpenSeconds>5</p1:OpenSeconds>
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="WorkflowOutput" />
+                </Nodes>
+                <Edges>
+                  <Edge From="0" To="1" Label="Source1" />
+                  <Edge From="2" To="3" Label="Source1" />
+                  <Edge From="3" To="6" Label="Source1" />
+                  <Edge From="4" To="5" Label="Source1" />
+                  <Edge From="5" To="6" Label="Source2" />
+                  <Edge From="6" To="9" Label="Source1" />
+                  <Edge From="7" To="8" Label="Source1" />
+                  <Edge From="8" To="9" Label="Source2" />
+                  <Edge From="9" To="12" Label="Source1" />
+                  <Edge From="10" To="11" Label="Source1" />
+                  <Edge From="11" To="12" Label="Source2" />
+                  <Edge From="12" To="13" Label="Source1" />
+                </Edges>
+              </Workflow>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="p1:PreflightDevices">
+                <p1:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</p1:ConfigRoot>
+                <p1:Kinds>camera</p1:Kinds>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="rx:SelectMany">
+              <Name>Cameras</Name>
+              <Workflow>
+                <Nodes>
+                  <Expression xsi:type="WorkflowInput">
+                    <Name>Source1</Name>
+                  </Expression>
+                  <Expression xsi:type="rx:AsyncSubject">
+                    <Name>CameraEntry</Name>
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>CameraEntry</Name>
+                  </Expression>
+                  <Expression xsi:type="PropertyMapping">
+                    <PropertyMappings>
+                      <Property Name="SerialNumber" Selector="SerialNumber" />
+                    </PropertyMappings>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="spk:SpinnakerCapture">
+                      <spk:Index xsi:nil="true" />
+                      <spk:SerialNumber />
+                      <spk:ColorProcessing>Default</spk:ColorProcessing>
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>CameraEntry</Name>
+                  </Expression>
+                  <Expression xsi:type="PropertyMapping">
+                    <PropertyMappings>
+                      <Property Name="Device" Selector="Name" />
+                    </PropertyMappings>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="p1:DeviceMonitor">
+                      <p1:Measure>frames</p1:Measure>
+                      <p1:OpenSeconds>5</p1:OpenSeconds>
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="WorkflowOutput" />
+                </Nodes>
+                <Edges>
+                  <Edge From="0" To="1" Label="Source1" />
+                  <Edge From="2" To="3" Label="Source1" />
+                  <Edge From="3" To="4" Label="Source1" />
+                  <Edge From="4" To="7" Label="Source1" />
+                  <Edge From="5" To="6" Label="Source1" />
+                  <Edge From="6" To="7" Label="Source2" />
+                  <Edge From="7" To="8" Label="Source1" />
+                </Edges>
+              </Workflow>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="p1:PreflightDevices">
+                <p1:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</p1:ConfigRoot>
+                <p1:Kinds>projectionCalibration</p1:Kinds>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="rx:SelectMany">
+              <Name>Projection</Name>
+              <Description>Only for a rig whose rig.yml has projectionCalibration: opens the projector's window with the rig's mesh map and gamma lookup and a test pattern, counts the frames rendered, and closes once the person has answered its Confirm after Go.</Description>
+              <Workflow>
+                <Nodes>
+                  <Expression xsi:type="WorkflowInput">
+                    <Name>Source1</Name>
+                  </Expression>
+                  <Expression xsi:type="rx:AsyncSubject">
+                    <Name>ProjectionEntry</Name>
+                  </Expression>
+                  <Expression xsi:type="ExternalizedMapping">
+                    <Property Name="WindowState" />
+                    <Property Name="Width" />
+                    <Property Name="Height" />
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="gl:CreateWindow">
+                      <gl:Width>1920</gl:Width>
+                      <gl:Height>1080</gl:Height>
+                      <gl:VSync>On</gl:VSync>
+                      <gl:SwapSync>false</gl:SwapSync>
+                      <gl:ClearColor>Gray</gl:ClearColor>
+                      <gl:ClearMask>DepthBufferBit ColorBufferBit</gl:ClearMask>
+                      <gl:CursorVisible>false</gl:CursorVisible>
+                      <gl:Location xsi:nil="true" />
+                      <gl:WindowBorder>Fixed</gl:WindowBorder>
+                      <gl:WindowState>Fullscreen</gl:WindowState>
+                      <gl:DisplayDevice>First</gl:DisplayDevice>
+                      <gl:TargetRenderFrequency>60</gl:TargetRenderFrequency>
+                      <gl:TargetUpdateFrequency>60</gl:TargetUpdateFrequency>
+                      <gl:RenderState />
+                      <gl:GraphicsMode>
+                        <gl:ColorFormat>
+                          <gl:Red>8</gl:Red>
+                          <gl:Green>8</gl:Green>
+                          <gl:Blue>8</gl:Blue>
+                          <gl:Alpha>8</gl:Alpha>
+                        </gl:ColorFormat>
+                        <gl:Depth>16</gl:Depth>
+                        <gl:Stencil>0</gl:Stencil>
+                        <gl:Samples>0</gl:Samples>
+                        <gl:AccumulatorFormat>
+                          <gl:Red>0</gl:Red>
+                          <gl:Green>0</gl:Green>
+                          <gl:Blue>0</gl:Blue>
+                          <gl:Alpha>0</gl:Alpha>
+                        </gl:AccumulatorFormat>
+                        <gl:Buffers>2</gl:Buffers>
+                        <gl:Stereo>false</gl:Stereo>
+                      </gl:GraphicsMode>
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="IncludeWorkflow" Path="BonVision:Primitives.BonVisionResources.bonsai" />
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="res:LoadResources" />
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="gl:RenderFrame" />
+                  </Expression>
+                  <Expression xsi:type="IncludeWorkflow" Path="BonVision:Environment.OrthographicView.bonsai">
+                    <Left>-135</Left>
+                    <Right>135</Right>
+                    <Bottom>-22.5</Bottom>
+                    <Top>82.5</Top>
+                  </Expression>
+                  <Expression xsi:type="rx:BehaviorSubject">
+                    <Name>ProjectionDraw</Name>
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>ProjectionEntry</Name>
+                  </Expression>
+                  <Expression xsi:type="PropertyMapping">
+                    <PropertyMappings>
+                      <Property Name="FileName" Selector="MeshMapPath" />
+                    </PropertyMappings>
+                  </Expression>
+                  <Expression xsi:type="IncludeWorkflow" Path="BonVision:Environment.MeshMapping.bonsai">
+                    <ClearColor>Gray</ClearColor>
+                    <FileName />
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>ProjectionEntry</Name>
+                  </Expression>
+                  <Expression xsi:type="PropertyMapping">
+                    <PropertyMappings>
+                      <Property Name="GammaLut" Selector="GammaLutPath" />
+                    </PropertyMappings>
+                  </Expression>
+                  <Expression xsi:type="IncludeWorkflow" Path="BonVision:Environment.GammaCorrection.bonsai">
+                    <ClearColor>Gray</ClearColor>
+                    <GammaLut />
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>ProjectionDraw</Name>
+                  </Expression>
+                  <Expression xsi:type="IncludeWorkflow" Path="BonVision:Primitives.DrawQuad.bonsai">
+                    <ExtentX>120</ExtentX>
+                    <ExtentY>60</ExtentY>
+                    <LocationX>0</LocationX>
+                    <LocationY>30</LocationY>
+                    <Layer>0</Layer>
+                    <Angle>0</Angle>
+                    <ColorR>1</ColorR>
+                    <ColorG>1</ColorG>
+                    <ColorB>1</ColorB>
+                    <ColorA>1</ColorA>
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>ProjectionEntry</Name>
+                  </Expression>
+                  <Expression xsi:type="PropertyMapping">
+                    <PropertyMappings>
+                      <Property Name="Device" Selector="Name" />
+                    </PropertyMappings>
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>ControlEvents</Name>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="orcl:OnCommand">
+                      <orcl:Name>Confirm</orcl:Name>
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>ExperimentGo</Name>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="p1:Answered" />
+                  </Expression>
+                  <Expression xsi:type="rx:PublishSubject">
+                    <Name>ProjectionClose</Name>
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>ProjectionClose</Name>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="p1:CloseWhen" />
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>ProjectionEntry</Name>
+                  </Expression>
+                  <Expression xsi:type="PropertyMapping">
+                    <PropertyMappings>
+                      <Property Name="Device" Selector="Name" />
+                    </PropertyMappings>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="p1:DeviceMonitor">
+                      <p1:Measure>frames</p1:Measure>
+                      <p1:OpenSeconds>5</p1:OpenSeconds>
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="WorkflowOutput" />
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>ProjectionClose</Name>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="rx:Delay">
+                      <rx:DueTime>PT1S</rx:DueTime>
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="rx:TakeUntil" />
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>ProjectionClose</Name>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="rx:Delay">
+                      <rx:DueTime>PT1S</rx:DueTime>
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="rx:TakeUntil" />
+                  </Expression>
+                  <Expression xsi:type="Annotation">
+                    <Name>Why CloseWhen, then TakeUntil</Name>
+                    <Text><![CDATA[The window is kept until the person's Confirm for it after Go, then closed in two steps. CloseWhen ends the render chain at its next frame, on the GL thread: ended from another thread, BonVision freed its GL resources off that thread while the chain was still drawing (AccessViolationException at the end of 1 run in 5 on PIPOFFICERIG, 7 Nov 2026). The window and the draw branch are taken until 1 s later, once the chain has stopped. A Stop before then (before Go, or before the answer) still tears it all down from the control server's thread.]]></Text>
+                  </Expression>
+                </Nodes>
+                <Edges>
+                  <Edge From="0" To="1" Label="Source1" />
+                  <Edge From="2" To="3" Label="Source1" />
+                  <Edge From="3" To="4" Label="Source1" />
+                  <Edge From="4" To="5" Label="Source1" />
+                  <Edge From="5" To="32" Label="Source1" />
+                  <Edge From="6" To="7" Label="Source1" />
+                  <Edge From="7" To="8" Label="Source1" />
+                  <Edge From="8" To="11" Label="Source1" />
+                  <Edge From="9" To="10" Label="Source1" />
+                  <Edge From="10" To="11" Label="Source2" />
+                  <Edge From="11" To="14" Label="Source1" />
+                  <Edge From="12" To="13" Label="Source1" />
+                  <Edge From="13" To="14" Label="Source2" />
+                  <Edge From="14" To="25" Label="Source1" />
+                  <Edge From="15" To="16" Label="Source1" />
+                  <Edge From="16" To="35" Label="Source1" />
+                  <Edge From="17" To="18" Label="Source1" />
+                  <Edge From="18" To="22" Label="Source3" />
+                  <Edge From="19" To="20" Label="Source1" />
+                  <Edge From="20" To="22" Label="Source1" />
+                  <Edge From="21" To="22" Label="Source2" />
+                  <Edge From="22" To="23" Label="Source1" />
+                  <Edge From="24" To="25" Label="Source2" />
+                  <Edge From="25" To="28" Label="Source1" />
+                  <Edge From="26" To="27" Label="Source1" />
+                  <Edge From="27" To="28" Label="Source2" />
+                  <Edge From="28" To="29" Label="Source1" />
+                  <Edge From="30" To="31" Label="Source1" />
+                  <Edge From="31" To="32" Label="Source2" />
+                  <Edge From="33" To="34" Label="Source1" />
+                  <Edge From="34" To="35" Label="Source2" />
+                </Edges>
+              </Workflow>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="rx:Merge" />
+            </Expression>
             <Expression xsi:type="rx:PublishSubject">
-              <Name>ProjectionDone</Name>
+              <Name>DeviceReports</Name>
+            </Expression>
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="2" Label="Source1" />
+            <Edge From="0" To="5" Label="Source1" />
+            <Edge From="0" To="7" Label="Source1" />
+            <Edge From="0" To="9" Label="Source1" />
+            <Edge From="2" To="3" Label="Source1" />
+            <Edge From="3" To="4" Label="Source1" />
+            <Edge From="5" To="6" Label="Source1" />
+            <Edge From="7" To="8" Label="Source1" />
+            <Edge From="9" To="10" Label="Source1" />
+            <Edge From="1" To="10" Label="Source2" />
+            <Edge From="6" To="11" Label="Source1" />
+            <Edge From="8" To="11" Label="Source2" />
+            <Edge From="10" To="11" Label="Source3" />
+            <Edge From="11" To="12" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="GroupWorkflow">
+        <Name>Ready</Name>
+        <Description>Once every device has opened or failed: Ready, and from then the devices metric once a second.</Description>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>Devices</Name>
             </Expression>
             <Expression xsi:type="SubscribeSubject">
-              <Name>ProjectionDone</Name>
+              <Name>DeviceReports</Name>
             </Expression>
             <Expression xsi:type="Combinator">
-              <Combinator xsi:type="rx:TakeUntil" />
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>ProjectionDone</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="rx:TakeUntil" />
-            </Expression>
-            <Expression xsi:type="Annotation">
-              <Name>Why TakeUntil</Name>
-              <Text><![CDATA[A SelectMany's workflow ends only when every branch has ended. The window branch and the draw branch never end by themselves, so each is taken until 1 s after the measurement's first row, which closes the window. Closing it at the row itself freed BonVision's GL resources while the render chain was still drawing: AccessViolationException at the end of 1 run in 5 on PIPOFFICERIG, 7 Nov 2026.]]></Text>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="rx:Delay">
-                <rx:DueTime>PT1S</rx:DueTime>
+              <Combinator xsi:type="p1:DeviceRates">
+                <p1:NotOpened>speakerArray</p1:NotOpened>
               </Combinator>
             </Expression>
             <Expression xsi:type="Combinator">
-              <Combinator xsi:type="rx:Delay">
-                <rx:DueTime>PT1S</rx:DueTime>
+              <Combinator xsi:type="orcl:ReportMetric">
+                <orcl:Name>devices</orcl:Name>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="rx:Take">
+                <rx:Count>1</rx:Count>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="orcl:ReportPhase">
+                <orcl:Phase>Ready</orcl:Phase>
               </Combinator>
             </Expression>
           </Nodes>
           <Edges>
-            <Edge From="0" To="1" Label="Source1" />
-            <Edge From="5" To="23" Label="Source1" />
-            <Edge From="22" To="27" Label="Source1" />
-            <Edge From="27" To="23" Label="Source2" />
-            <Edge From="16" To="25" Label="Source1" />
-            <Edge From="24" To="28" Label="Source1" />
-            <Edge From="28" To="25" Label="Source2" />
+            <Edge From="0" To="2" Label="Source1" />
+            <Edge From="1" To="2" Label="Source2" />
             <Edge From="2" To="3" Label="Source1" />
             <Edge From="3" To="4" Label="Source1" />
             <Edge From="4" To="5" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="GroupWorkflow">
+        <Name>Check</Name>
+        <Description>From Go: each open device counted in turn (step metric), then each device a person confirms asked in turn (prompt metric, answered by Confirm). The rows go to RawFile, which is closed before Finished.</Description>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="ExternalizedMapping">
+              <Property Name="FileName" DisplayName="RawFile" />
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>Devices</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>DeviceReports</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>ExperimentGo</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>ControlEvents</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="orcl:OnCommand">
+                <orcl:Name>Confirm</orcl:Name>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="p1:RunCheck">
+                <p1:NotOpened>speakerArray</p1:NotOpened>
+                <p1:Questions>speakerArray=Did each speaker play the test sound?;projectionCalibration=Does the test pattern fill the dome?</p1:Questions>
+                <p1:Seconds>5</p1:Seconds>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="rx:PublishSubject">
+              <Name>CheckEvents</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>CheckEvents</Name>
+            </Expression>
+            <Expression xsi:type="MemberSelector">
+              <Selector>Step</Selector>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="rx:DistinctUntilChanged" />
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="orcl:ReportMetric">
+                <orcl:Name>step</orcl:Name>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>CheckEvents</Name>
+            </Expression>
+            <Expression xsi:type="MemberSelector">
+              <Selector>Prompt</Selector>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="rx:DistinctUntilChanged" />
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="orcl:ReportMetric">
+                <orcl:Name>prompt</orcl:Name>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>CheckEvents</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="p1:RowsOf" />
+            </Expression>
+            <Expression xsi:type="io:CsvWriter">
+              <io:FileName>preflight-raw.csv</io:FileName>
+              <io:Append>false</io:Append>
+              <io:Overwrite>true</io:Overwrite>
+              <io:Suffix>None</io:Suffix>
+              <io:IncludeHeader>true</io:IncludeHeader>
+              <io:Selector />
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>CheckEvents</Name>
+            </Expression>
+            <Expression xsi:type="rx:Condition">
+              <Name>Done</Name>
+              <Workflow>
+                <Nodes>
+                  <Expression xsi:type="WorkflowInput">
+                    <Name>Source1</Name>
+                  </Expression>
+                  <Expression xsi:type="MemberSelector">
+                    <Selector>Done</Selector>
+                  </Expression>
+                  <Expression xsi:type="WorkflowOutput" />
+                </Nodes>
+                <Edges>
+                  <Edge From="0" To="1" Label="Source1" />
+                  <Edge From="1" To="2" Label="Source1" />
+                </Edges>
+              </Workflow>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="rx:Delay">
+                <rx:DueTime>PT1.5S</rx:DueTime>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="orcl:ReportPhase">
+                <orcl:Phase>Finished</orcl:Phase>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="Annotation">
+              <Name>Finished after the file</Name>
+              <Text><![CDATA[CheckEvents completes after its Done state, which closes CsvWriter (its subscription ends with the stream), and Finished is reported 1.5 s after Done: the agent stops the workflow 2 s after Finished and then judges RawFile, so the file is complete well before.]]></Text>
+            </Expression>
+          </Nodes>
+          <Edges>
+            <Edge From="1" To="6" Label="Source1" />
+            <Edge From="2" To="6" Label="Source2" />
+            <Edge From="3" To="6" Label="Source3" />
+            <Edge From="4" To="5" Label="Source1" />
+            <Edge From="5" To="6" Label="Source4" />
             <Edge From="6" To="7" Label="Source1" />
-            <Edge From="7" To="8" Label="Source1" />
-            <Edge From="8" To="11" Label="Source1" />
+            <Edge From="8" To="9" Label="Source1" />
             <Edge From="9" To="10" Label="Source1" />
-            <Edge From="10" To="11" Label="Source2" />
-            <Edge From="11" To="14" Label="Source1" />
+            <Edge From="10" To="11" Label="Source1" />
             <Edge From="12" To="13" Label="Source1" />
-            <Edge From="13" To="14" Label="Source2" />
-            <Edge From="15" To="16" Label="Source1" />
-            <Edge From="14" To="19" Label="Source1" />
+            <Edge From="13" To="14" Label="Source1" />
+            <Edge From="14" To="15" Label="Source1" />
+            <Edge From="16" To="17" Label="Source1" />
             <Edge From="17" To="18" Label="Source1" />
-            <Edge From="18" To="19" Label="Source2" />
-            <Edge From="19" To="21" Label="Source1" />
-            <Edge From="21" To="20" Label="Source1" />
+            <Edge From="0" To="18" Label="Source2" />
+            <Edge From="19" To="20" Label="Source1" />
+            <Edge From="20" To="21" Label="Source1" />
+            <Edge From="21" To="22" Label="Source1" />
           </Edges>
         </Workflow>
       </Expression>
     </Nodes>
     <Edges>
-      <Edge From="0" To="2" Label="Source1" />
-      <Edge From="0" To="4" Label="Source1" />
-      <Edge From="1" To="7" Label="Source2" />
       <Edge From="2" To="3" Label="Source1" />
-      <Edge From="3" To="6" Label="Source1" />
-      <Edge From="4" To="5" Label="Source1" />
-      <Edge From="5" To="6" Label="Source2" />
-      <Edge From="6" To="7" Label="Source1" />
-      <Edge From="7" To="8" Label="Source1" />
-      <Edge From="0" To="9" Label="Source1" />
-      <Edge From="9" To="11" Label="Source1" />
-      <Edge From="10" To="11" Label="Source2" />
-      <Edge From="11" To="6" Label="Source3" />
+      <Edge From="0" To="4" Label="Source1" />
+      <Edge From="1" To="6" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>
