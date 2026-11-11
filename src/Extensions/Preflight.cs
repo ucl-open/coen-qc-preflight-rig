@@ -652,3 +652,42 @@ public class BoardPulses
         return 0;
     }
 }
+
+/// <summary>
+/// A Harp board's port opened again when Windows refuses it. Bonsai.Harp's Device opens the port,
+/// reads the board's identity, closes it and reopens it at once; on a busy rig the reopen can find
+/// the port not yet released and fail with Access to the port is denied (BLUE-OPTO-1, 11 Nov 2026:
+/// a different board each run). Waits, then subscribes to the Device again, up to Attempts in all.
+/// </summary>
+[Combinator]
+[WorkflowElementCategory(ElementCategory.Combinator)]
+[Description("Subscribes to a Harp Device again after Access to the port is denied, up to Attempts in all.")]
+public class RetryPortOpen
+{
+    int attempts = 4;
+    double delaySeconds = 0.5;
+
+    /// <summary>The device's name, for the line on stderr.</summary>
+    public string Device { get; set; }
+    /// <summary>Tries in all, the first included.</summary>
+    public int Attempts { get { return attempts; } set { attempts = value; } }
+    /// <summary>Seconds between tries.</summary>
+    public double DelaySeconds { get { return delaySeconds; } set { delaySeconds = value; } }
+
+    public IObservable<TSource> Process<TSource>(IObservable<TSource> source)
+    {
+        return Observable.Defer(() => Attempt(source, Device, 1, Attempts, TimeSpan.FromSeconds(DelaySeconds)));
+    }
+
+    static IObservable<TSource> Attempt<TSource>(IObservable<TSource> source, string device, int attempt, int attempts, TimeSpan delay)
+    {
+        return source.Catch<TSource, Exception>(e =>
+        {
+            var inner = e;
+            while (inner.InnerException != null && (inner is AggregateException || inner is System.Reflection.TargetInvocationException)) inner = inner.InnerException;
+            if (!(inner is UnauthorizedAccessException) || attempt >= attempts) return Observable.Throw<TSource>(e);
+            Console.Error.WriteLine("preflight: " + device + " port refused on try " + attempt + " of " + attempts + "; trying again");
+            return Observable.Timer(delay).SelectMany(_ => Attempt(source, device, attempt + 1, attempts, delay));
+        });
+    }
+}
