@@ -12,8 +12,8 @@ from typing import Dict, Optional
 import yaml
 from open_rigs.components import ProjectionCalibration, SpeakerArray
 from open_rigs.core.rig import Rig
-from open_rigs.devices import HarpStepperDriver, HarpTimestampGeneratorGen3, LicketySplit
-from open_rigs.rigs.behaviour_box import BehaviorBoard, SpinnakerCamera
+from open_rigs.devices import HarpTimestampGeneratorGen3, LicketySplit
+from open_rigs.rigs.behaviour_box import BehaviorBoard, HarpStepperDriver, SpinnakerCamera
 from pydantic import Field
 
 # The keyed sections, in the order the check runs them, by their rig.yml key.
