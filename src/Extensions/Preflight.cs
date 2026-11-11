@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Bonsai;
@@ -736,6 +737,75 @@ public class RetryPortOpen
             if (!(inner is UnauthorizedAccessException) || attempt >= attempts) return Observable.Throw<TSource>(e);
             Console.Error.WriteLine("preflight: " + device + " port refused on try " + attempt + " of " + attempts + "; trying again");
             return Observable.Timer(delay).SelectMany(_ => Attempt(source, device, attempt + 1, attempts, delay));
+        });
+    }
+}
+
+// Live view (11 Nov 2026). StreamDevices streams <Device>.Data subjects it finds when the workflow
+// is built; this workflow opens its devices inside SelectManys, once per rig.yml entry. So each
+// branch hands its device's data, by name, to one hub per data type (ShareDeviceData), and a
+// top-level source per name the lab's workflows use (HarpDeviceData, CameraDeviceData) takes its
+// own back out, into a <Device>.Data subject that StreamDevices finds. A name this rig.yml lacks is
+// a source that never emits, which StreamDevices does not look at; a rig.yml device with no source
+// here is in its skipped list.
+static class DeviceHub<T>
+{
+    public static readonly ISubject<Tuple<string, T>, Tuple<string, T>> Items = Subject.Synchronize(new Subject<Tuple<string, T>>());
+}
+
+/// <summary>Passes the device's data on unchanged, and hands each item, with the device's name, to the live view's hub.</summary>
+[Combinator]
+[WorkflowElementCategory(ElementCategory.Combinator)]
+[Description("Passes the device's data on unchanged and hands it, by the device's name, to HarpDeviceData or CameraDeviceData for the live view.")]
+public class ShareDeviceData
+{
+    /// <summary>The device's name.</summary>
+    public string Device { get; set; }
+
+    public IObservable<TSource> Process<TSource>(IObservable<TSource> source)
+    {
+        return Observable.Defer(() =>
+        {
+            var name = Device;
+            return source.Do(item => DeviceHub<TSource>.Items.OnNext(Tuple.Create(name, item)));
+        });
+    }
+}
+
+/// <summary>A Harp board's messages, from its branch's ShareDeviceData; nothing when this rig has no board of this name.</summary>
+[Combinator]
+[WorkflowElementCategory(ElementCategory.Source)]
+[Description("A Harp board's messages by its name, from its branch's ShareDeviceData; nothing when this rig has no board of this name.")]
+public class HarpDeviceData
+{
+    /// <summary>The board's name, such as BehaviorBoard-Main.</summary>
+    public string Device { get; set; }
+
+    public IObservable<HarpMessage> Process()
+    {
+        return Observable.Defer(() =>
+        {
+            var name = Device;
+            return DeviceHub<HarpMessage>.Items.Where(item => item.Item1 == name).Select(item => item.Item2);
+        });
+    }
+}
+
+/// <summary>A camera's frames, from its branch's ShareDeviceData; nothing when this rig has no camera of this name.</summary>
+[Combinator]
+[WorkflowElementCategory(ElementCategory.Source)]
+[Description("A camera's frames by its name, from its branch's ShareDeviceData; nothing when this rig has no camera of this name.")]
+public class CameraDeviceData
+{
+    /// <summary>The camera's name, such as Camera-Face.</summary>
+    public string Device { get; set; }
+
+    public IObservable<Bonsai.Spinnaker.SpinnakerDataFrame> Process()
+    {
+        return Observable.Defer(() =>
+        {
+            var name = Device;
+            return DeviceHub<Bonsai.Spinnaker.SpinnakerDataFrame>.Items.Where(item => item.Item1 == name).Select(item => item.Item2);
         });
     }
 }

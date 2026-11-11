@@ -10,6 +10,7 @@
                  xmlns:gl="clr-namespace:Bonsai.Shaders;assembly=Bonsai.Shaders"
                  xmlns:res="clr-namespace:Bonsai.Resources;assembly=Bonsai.System"
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
+                 xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
                  xmlns="https://bonsai-rx.org/2018/workflow">
   <Description>The pre-training preflight (PROTOTYPE), run from rig-control's Preflight card. Ready mode: every device this machine's rig.yml declares is opened and kept open until Stop, its rate reported once a second as the devices metric; a behaviour board with trigger 0 enabled triggers the cameras (OpenRigs.Video TriggeredSpinnaker with rig.yml's exposure, gain, binning and pixelFormat, Mono8 when not set) at its frequency; the Pulse command pulses a behaviour board line. Go counts each device in turn (step metric), asks the person about each device that needs it (prompt metric, answered by Confirm), writes the raw rows (Device,Measure,Value,Detail) to RawFile and reports Finished. coen_qc_preflight_rig.judge applies the thresholds.</Description>
   <Workflow>
@@ -170,6 +171,9 @@
                       <p1:DelaySeconds>0.5</p1:DelaySeconds>
                     </Combinator>
                   </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="p1:ShareDeviceData" />
+                  </Expression>
                 </Nodes>
                 <Edges>
                   <Edge From="0" To="1" Label="Source1" />
@@ -181,8 +185,10 @@
                   <Edge From="7" To="8" Label="Source1" />
                   <Edge From="8" To="9" Label="Source2" />
                   <Edge From="9" To="14" Label="Source1" />
-                  <Edge From="14" To="12" Label="Source1" />
+                  <Edge From="14" To="15" Label="Source1" />
+                  <Edge From="15" To="12" Label="Source1" />
                   <Edge From="11" To="14" Label="Source2" />
+                  <Edge From="11" To="15" Label="Source2" />
                   <Edge From="10" To="11" Label="Source1" />
                   <Edge From="11" To="12" Label="Source2" />
                   <Edge From="12" To="13" Label="Source1" />
@@ -243,14 +249,19 @@
                     </Combinator>
                   </Expression>
                   <Expression xsi:type="WorkflowOutput" />
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="p1:ShareDeviceData" />
+                  </Expression>
                 </Nodes>
                 <Edges>
                   <Edge From="0" To="1" Label="Source1" />
                   <Edge From="2" To="3" Label="Source1" />
                   <Edge From="3" To="4" Label="Source1" />
-                  <Edge From="4" To="7" Label="Source1" />
+                  <Edge From="4" To="9" Label="Source1" />
+                  <Edge From="9" To="7" Label="Source1" />
                   <Edge From="5" To="6" Label="Source1" />
                   <Edge From="6" To="7" Label="Source2" />
+                  <Edge From="6" To="9" Label="Source2" />
                   <Edge From="7" To="8" Label="Source1" />
                 </Edges>
               </Workflow>
@@ -678,11 +689,54 @@
           </Edges>
         </Workflow>
       </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="p1:HarpDeviceData">
+          <p1:Device>BehaviorBoard-Main</p1:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name>BehaviorBoard-Main.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="p1:CameraDeviceData">
+          <p1:Device>Camera-Face</p1:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name>Camera-Face.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="p1:CameraDeviceData">
+          <p1:Device>Camera-Pupil</p1:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name>Camera-Pupil.Data</Name>
+      </Expression>
+      <Expression xsi:type="Combinator">
+        <Combinator xsi:type="p1:CameraDeviceData">
+          <p1:Device>Camera-Body</p1:Device>
+        </Combinator>
+      </Expression>
+      <Expression xsi:type="rx:PublishSubject">
+        <Name>Camera-Body.Data</Name>
+      </Expression>
+      <Expression xsi:type="lv:StreamDevices">
+        <Name>LiveView</Name>
+        <Description>Streams this rig's Behavior board and cameras to rig-control's live view (OpenRigs.LiveView): data on TCP 5556, video on 5558, as av-dome does. Their &lt;Device&gt;.Data subjects come from the branches through ShareDeviceData, one per name the lab's workflows use (BehaviorBoard-Main, Camera-Face, Camera-Pupil, Camera-Body; av-dome's RigDevice names, 11 Nov 2026). No experiment folder, so the session key stays ready. Last in the workflow: it finds only subjects built before it.</Description>
+        <lv:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</lv:ConfigRoot>
+        <lv:DataPort>5556</lv:DataPort>
+        <lv:VideoPort>5558</lv:VideoPort>
+      </Expression>
     </Nodes>
     <Edges>
       <Edge From="2" To="3" Label="Source1" />
       <Edge From="0" To="4" Label="Source1" />
       <Edge From="1" To="6" Label="Source1" />
+      <Edge From="7" To="8" Label="Source1" />
+      <Edge From="9" To="10" Label="Source1" />
+      <Edge From="11" To="12" Label="Source1" />
+      <Edge From="13" To="14" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>
