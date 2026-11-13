@@ -101,16 +101,20 @@ speakerArray:
   errorSoundChannel: 2      # the error sound's channel
   unusedChannels: [30]      # not connected
   # Position is relative to the subject: azimuth 0 = straight ahead, positive to the right.
+  # filter: each speaker's SpeakerFilter artefact; the dome model refuses a speaker without one.
   speakers:
     left:
       position: { azimuth: -90, elevation: 15 }
       channel: 0
+      filter: calibration/speaker-left.json
     right:
       position: { azimuth: 90, elevation: 15 }
       channel: 1
+      filter: calibration/speaker-right.json
     centre:
       position: { azimuth: 0, elevation: 15 }
       channel: 2
+      filter: calibration/speaker-centre.json
 
 zapit:
   host: 127.0.0.1
