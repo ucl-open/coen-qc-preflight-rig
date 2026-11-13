@@ -30,15 +30,19 @@ behaviorBoard:
     usbSerial: BG01WA0E
     pulseController:
       outputPulseEnable: "DO1, DO2, DO3"
-      # Each line is a FixedPulse (width set here) or a CalibratedPulse (width looked up per reward
-      # on a valve calibration curve in calibration\). A fixed reward line delivers ceil(ul / 2)
-      # pulses of its width, assuming 2 ul per pulse; a calibrated one delivers the requested volume.
+      # Each reward valve is a CalibratedPulse: its curve, in calibration\ beside this file, plans every
+      # reward's pulses at the gap it was calibrated at. The ZapitTrigger line (DO3) is held high, never pulsed:
+      # the board model needs a DO3 entry, so it is the dome template's 0 ms FixedPulse.
       outputs:
-        DO1: { discriminatorType: FixedPulse, pulseWidthMs: 50 }   # left reward valve, ms
-        DO2: { discriminatorType: FixedPulse, pulseWidthMs: 45 }   # right reward valve, ms
-        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 5 }    # Zapit TTL (used when zapit.hardwareTriggered is true)
-        # Calibrated reward line:
-        # DO1: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json }
+        DO1: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json }
+        DO2: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO2.json }
+        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }
+    # What each line drives (dome rig model, open_rigs.rigs.dome): one RewardValve per side and one ZapitTrigger.
+    wiring:
+      DO0: { device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }
+      DO1: { device: RewardValve, side: left }
+      DO2: { device: RewardValve, side: right }
+      DO3: { device: ZapitTrigger, note: also the masking light }
     cameraTriggerController:
       trigger0Enabled: true     # camera trigger 0 shares the DO0 pin
       trigger0Frequency: 50     # Hz
@@ -108,6 +112,7 @@ speakerArray:
     bootDelay: 3.0          # s; guards a driver fault if the workflow stops during mixer init
   syncChannel: 31           # carries a copy of each stimulus for alignment with acquisition
   syncGain: 0.2
+  errorSoundChannel: 2      # the error sound's channel
   unusedChannels: [30]      # not connected
   # Speakers currently wired on this rig. Position is relative to the subject:
   # azimuth 0 = straight ahead, positive to the right; elevation 0 = horizontal.
@@ -155,19 +160,12 @@ speakerArray:
   #   layer4_-90:    { position: { azimuth: -90,    elevation: -15 }, channel: 24 }
   #   layer4_-120:   { position: { azimuth: -120,   elevation: -15 }, channel: 25 }
 
-# Which line drives each side's reward valve: a left reward pulses the left line, a right reward the
-# right line, each as its outputs entry says. Required; rig-control's Calibrations page names each
-# valve line's side from it too.
-rewardValves: { left: DO1, right: DO2 }
-interPulseInterval: 50   # ms between consecutive reward pulses; must let the valve seat
-
 # Zapit optogenetics server (tcpServer section of the Zapit settings file). Only contacted
 # when the task YAML sets optogenetics.enabled: true, so non-opto rigs can leave the defaults.
 zapit:
   host: 127.0.0.1         # PC running Zapit; 127.0.0.1 when Zapit runs on this rig PC
   port: 1488
-  hardwareTriggered: false  # true once DO<triggerLine> is cabled to the Zapit DAQ trigger input
-  triggerLine: 3            # behavior board DO line for the TTL; width from outputs.DO3
+  hardwareTriggered: false  # true once the ZapitTrigger line is cabled to the Zapit DAQ trigger input
 # Default absolute stage position at session start (steps)
 lickSpoutDefaultPosition:
   baseTransverse: 0       # motor 1
