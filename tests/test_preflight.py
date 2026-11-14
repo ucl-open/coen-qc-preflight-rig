@@ -28,7 +28,7 @@ def test_a_dome_fixture_is_a_valid_dome_rig(name):
 
 
 def test_a_box_plans_its_board_and_camera_only():
-    assert [d.name for d in plan.plan(rig.load(FIXTURES / "GEEK-BBOX1.yml"))] == ["BehaviorBoard-Main", "Camera-Box"]
+    assert [d.name for d in plan.plan(rig.load(FIXTURES / "BBOX-1.yml"))] == ["BehaviorBoard-Main", "Camera-Overhead"]
 
 
 def test_unknown_keys_and_absent_sections_are_fine(tmp_path):
@@ -38,7 +38,7 @@ def test_unknown_keys_and_absent_sections_are_fine(tmp_path):
 
 
 def test_a_wrong_device_entry_is_refused(tmp_path):
-    data = yaml.safe_load((FIXTURES / "GEEK-BBOX1.yml").read_text(encoding="utf-8"))
+    data = yaml.safe_load((FIXTURES / "BBOX-1.yml").read_text(encoding="utf-8"))
     del data["behaviorBoard"]["main"]["portName"]
     f = tmp_path / "rig.yml"
     f.write_text(yaml.safe_dump(data), encoding="utf-8")
@@ -53,11 +53,11 @@ def _raw(tmp_path, rows):
 
 
 GOOD_BOX = [("BehaviorBoard-Main", "messages", "120", ""), ("BehaviorBoard-Main", "seconds", "5", ""),
-            ("Camera-Box", "frames", "250", ""), ("Camera-Box", "seconds", "5", "")]
+            ("Camera-Overhead", "frames", "250", ""), ("Camera-Overhead", "seconds", "5", "")]
 
 
 def _judge(tmp_path, rows):
-    return judge.judge(FIXTURES / "GEEK-BBOX1.yml", _raw(tmp_path, rows), THRESHOLDS, "GEEK-BBOX1", "abc")
+    return judge.judge(FIXTURES / "BBOX-1.yml", _raw(tmp_path, rows), THRESHOLDS, "BBOX-1", "abc")
 
 
 def test_a_box_that_works_passes(tmp_path):
@@ -67,10 +67,10 @@ def test_a_box_that_works_passes(tmp_path):
 
 
 def test_a_device_that_did_not_open_fails_with_its_message(tmp_path):
-    rows = GOOD_BOX[:2] + [("Camera-Box", "error", "", "The camera 23201539 was not found")]
+    rows = GOOD_BOX[:2] + [("Camera-Overhead", "error", "", "The camera 23201539 was not found")]
     record = _judge(tmp_path, rows)
     assert not record["passed"]
-    assert record["devices"][1] == {"device": "Camera-Box", "ok": False, "why": "The camera 23201539 was not found"}
+    assert record["devices"][1] == {"device": "Camera-Overhead", "ok": False, "why": "The camera 23201539 was not found"}
 
 
 def test_a_device_that_did_not_report_fails(tmp_path):
@@ -78,7 +78,7 @@ def test_a_device_that_did_not_report_fails(tmp_path):
 
 
 def test_a_slow_camera_fails(tmp_path):
-    rows = GOOD_BOX[:2] + [("Camera-Box", "frames", "200", ""), ("Camera-Box", "seconds", "5", "")]
+    rows = GOOD_BOX[:2] + [("Camera-Overhead", "frames", "200", ""), ("Camera-Overhead", "seconds", "5", "")]
     assert _judge(tmp_path, rows)["devices"][1]["why"] == "40.0 frames/s, 49.0 needed"
 
 
@@ -114,7 +114,7 @@ def test_the_record_is_dated_by_the_raw_file(tmp_path):
     raw = _raw(tmp_path, GOOD_BOX)
     then = datetime(2026, 11, 6, 9, 0, tzinfo=timezone.utc).timestamp()
     os.utime(raw, (then, then))
-    record = judge.judge(FIXTURES / "GEEK-BBOX1.yml", raw, THRESHOLDS, "GEEK-BBOX1", "abc")
+    record = judge.judge(FIXTURES / "BBOX-1.yml", raw, THRESHOLDS, "BBOX-1", "abc")
     assert record["at"] == "2026-11-06T09:00:00+00:00"
 
 

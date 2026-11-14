@@ -1,6 +1,6 @@
 """Every rig's rig.yml, read by one schema.
 
-A superset of the lab's keyed rig.yml layouts (coen-behaviour-box, av-dome): each device kind is a group
+A superset of the lab's keyed rig.yml layouts (coen-behaviour-box and the dome rigs): each device kind is a group
 of named entries and defaults to none, each single section is optional, and any key not here is ignored
 (pydantic's default), so a dome's file and a box's both load. The device classes are open_rigs', never
 copies, so a rig.yml the workflows take is one this takes.

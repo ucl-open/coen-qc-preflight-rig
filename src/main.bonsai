@@ -57,7 +57,7 @@
                 </Command>
                 <Command>
                   <Name>Home</Name>
-                  <Description>Zeroes a stepper driver motor as av-dome does: off its home switch if on it, then towards zero until the switch stops it, then its position set to 0. The text is the driver and motor, such as StepperDriver-A Motor1; only a motor whose motor and input rig.yml's wiring names.</Description>
+                  <Description>Zeroes a stepper driver motor as the lab's dome workflows do: off its home switch if on it, then towards zero until the switch stops it, then its position set to 0. The text is the driver and motor, such as StepperDriver-A Motor1; only a motor whose motor and input rig.yml's wiring names.</Description>
                 </Command>
                 <Command>
                   <Name>Confirm</Name>
@@ -804,7 +804,7 @@
       </Expression>
       <Expression xsi:type="lv:StreamDevices">
         <Name>LiveView</Name>
-        <Description>Streams this rig's Behavior board, Lickety Splits, stepper drivers and cameras to rig-control's live view (OpenRigs.LiveView): data on TCP 5556, video on 5558, as av-dome does. Their &lt;Device&gt;.Data subjects come from the branches through ShareDeviceData, one per name the lab's workflows use (BehaviorBoard-Main, LicketySplit-Left, LicketySplit-Right, StepperDriver-A, StepperDriver-B, Camera-Face, Camera-Pupil, Camera-Body; av-dome's RigDevice names, 11 Nov 2026). No experiment folder, so the session key stays ready. Last in the workflow: it finds only subjects built before it.</Description>
+        <Description>Streams this rig's Behavior board, Lickety Splits, stepper drivers and cameras to rig-control's live view (OpenRigs.LiveView): data on TCP 5556, video on 5558, as the lab's workflows do. Their &lt;Device&gt;.Data subjects come from the branches through ShareDeviceData, one per name the lab's workflows use (BehaviorBoard-Main, LicketySplit-Left, LicketySplit-Right, StepperDriver-A, StepperDriver-B, Camera-Face, Camera-Pupil, Camera-Body; the RigDevice names, 11 Nov 2026). No experiment folder, so the session key stays ready. Last in the workflow: it finds only subjects built before it.</Description>
         <lv:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</lv:ConfigRoot>
         <lv:DataPort>5556</lv:DataPort>
         <lv:VideoPort>5558</lv:VideoPort>
