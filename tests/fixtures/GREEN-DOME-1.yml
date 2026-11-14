@@ -29,7 +29,7 @@ behaviorBoard:
     portName: COM6
     usbSerial: BG01WA0E
     pulseController:
-      outputPulseEnable: "DO1, DO2, DO3"
+      outputPulseEnable: "DO1, DO2"
       # Each reward valve is a CalibratedPulse: its curve, in calibration\ beside this file, plans every
       # reward's pulses at the gap it was calibrated at. The ZapitTrigger line (DO3) is held high, never pulsed:
       # the board model needs a DO3 entry, so it is the dome template's 0 ms FixedPulse.
@@ -49,7 +49,7 @@ behaviorBoard:
       trigger1Enabled: false    # camera trigger 1 shares the DO1 pin, which drives the left valve; off means nothing is written to it
       trigger1Frequency: 50     # Hz, used only if trigger 1 is enabled
     runningWheel:
-      wheelDiameterMm: 170
+      wheelDiameterMm: 75
       countsPerRev: 4096
 
 timestampGeneratorGen3:
