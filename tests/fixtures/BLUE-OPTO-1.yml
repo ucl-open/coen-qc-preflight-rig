@@ -21,7 +21,7 @@ behaviorBoard:
         DO1: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json }
         DO2: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO2.json }
         DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }
-    # What each line drives (dome rig model, open_rigs.rigs.dome): one RewardValve per side and one ZapitTrigger.
+    # What each line drives (lab rig model, open_rigs.rigs.lab_rig): one RewardValve per side and one ZapitTrigger.
     wiring:
       DO0: { device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }
       DO1: { device: RewardValve, side: left }

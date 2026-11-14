@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=C:/Github/Coen-Lab/coen-behaviour-box/src/DataSchemas/ucl_open_coen_behaviour_box.json#/$defs/BehaviourBoxRig
+# yaml-language-server: $schema=C:/Github/Coen-Lab/coen-behaviour-box/src/DataSchemas/ucl_open_coen_behaviour_box.json#/$defs/LabRig
 # Rig configuration. Each device sits under its kind by name: the workflow drives behaviorBoard: main:
 # (BehaviorBoard-Main in the data) and camera: overhead: (Camera-Overhead), and stops at startup if either
 # is missing. The frame rate is behaviorBoard.main.cameraTriggerController.trigger0Frequency;

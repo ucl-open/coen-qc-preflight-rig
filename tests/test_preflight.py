@@ -21,10 +21,10 @@ def test_a_dome_plans_every_device(name):
 
 
 @pytest.mark.parametrize("name", ["GREEN-DOME-1", "BLUE-OPTO-1", "BLUE-OPTO-2"])
-def test_a_dome_fixture_is_a_valid_dome_rig(name):
-    from open_rigs.rigs.dome import DomeRig
+def test_a_dome_fixture_is_a_valid_lab_rig(name):
+    from open_rigs.rigs.lab_rig import LabRig
 
-    DomeRig.model_validate(yaml.safe_load((FIXTURES / f"{name}.yml").read_text(encoding="utf-8")))
+    LabRig.model_validate(yaml.safe_load((FIXTURES / f"{name}.yml").read_text(encoding="utf-8")))
 
 
 def test_a_box_plans_its_board_and_camera_only():
