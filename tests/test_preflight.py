@@ -12,7 +12,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 THRESHOLDS = Path(__file__).parents[1] / "config" / "thresholds.yml"
 DOME = ["BehaviorBoard-Main", "TimestampGeneratorGen3-Main", "StepperDriver-A", "StepperDriver-B",
         "LicketySplit-Left", "LicketySplit-Right", "Camera-Face", "Camera-Pupil", "Camera-Body",
-        "SpeakerArray", "ProjectionCalibration"]
+        "ProjectionCalibration"]
 
 
 @pytest.mark.parametrize("name", ["GREEN-DOME-1", "BLUE-OPTO-1", "BLUE-OPTO-2"])
@@ -98,7 +98,7 @@ def test_a_device_rig_yml_does_not_declare_fails(tmp_path):
 def _dome(tmp_path, projection):
     rows = [(d, "messages", "9", "") for d in DOME[:6]] + \
            [(d, m, v, "") for d in DOME[6:9] for m, v in (("frames", "250"), ("seconds", "5"))] + \
-           [("SpeakerArray", "person", "1", "")] + [("ProjectionCalibration", m, v, "") for m, v in projection]
+           [("ProjectionCalibration", m, v, "") for m, v in projection]
     record = judge.judge(FIXTURES / "GREEN-DOME-1.yml", _raw(tmp_path, rows), THRESHOLDS, "GREEN-DOME-1", "abc")
     return {d["device"]: d["why"] for d in record["devices"] if not d["ok"]}
 

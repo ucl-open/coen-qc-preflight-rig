@@ -29,7 +29,7 @@ public class PreflightDevice
     public string Kind { get; set; }
     /// <summary>The entry's key, such as body; empty for a single section.</summary>
     public string Instance { get; set; }
-    /// <summary>Camera-Body, as lib-open-rigs names it; SpeakerArray for a single section.</summary>
+    /// <summary>Camera-Body, as lib-open-rigs names it; ProjectionCalibration for a single section.</summary>
     public string Name { get; set; }
     /// <summary>The entry's portName, empty when it has none.</summary>
     public string PortName { get; set; }
@@ -114,11 +114,6 @@ static class Preflight
 {
     public static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
 
-    public static HashSet<string> Kinds(string kinds)
-    {
-        return new HashSet<string>((kinds ?? string.Empty).Split(',').Select(k => k.Trim()).Where(k => k.Length > 0));
-    }
-
     // An error's message for a CSV field and the devices metric: no commas, semicolons, quotes or line breaks.
     public static string Clean(Exception error)
     {
@@ -171,9 +166,6 @@ public class PreflightDevices
                 case "stepperDriver": devices.AddRange(Each(kind, rig.StepperDriver, Stepper)); break;
                 case "licketySplit": devices.AddRange(Each(kind, rig.LicketySplit, (d, s) => d.PortName = s.PortName ?? string.Empty)); break;
                 case "camera": devices.AddRange(Each(kind, rig.Camera, Camera)); break;
-                case "speakerArray":
-                    if (rig.SpeakerArray != null) devices.Add(Single(kind));
-                    break;
                 case "projectionCalibration":
                     if (rig.ProjectionCalibration != null)
                     {
@@ -363,15 +355,9 @@ public class DeviceMonitor
 [Description("Each device's rate over the last second, or its error, once a second once every device has opened or failed.")]
 public class DeviceRates
 {
-    string notOpened = "speakerArray";
-
-    /// <summary>Kinds with nothing to open, only a person's answer: listed as Device person 0.</summary>
-    public string NotOpened { get { return notOpened; } set { notOpened = value; } }
-
     /// <summary>The devices metric's text.</summary>
     public IObservable<string> Process(IObservable<PreflightDevice[]> devices, IObservable<DeviceReport> reports)
     {
-        var skip = Preflight.Kinds(NotOpened);
         return Observable.Create<string>(observer =>
         {
             var gate = new object();
@@ -392,8 +378,8 @@ public class DeviceRates
                 string text;
                 lock (gate)
                 {
-                    if (list == null || !list.All(d => skip.Contains(d.Kind) || settled.Contains(d.Name))) return;
-                    text = string.Join(";", list.Select(d => Entry(d, skip.Contains(d.Kind) ? null : latest[d.Name])));
+                    if (list == null || !list.All(d => settled.Contains(d.Name))) return;
+                    text = string.Join(";", list.Select(d => Entry(d, latest[d.Name])));
                 }
                 observer.OnNext(text);
             });
@@ -403,7 +389,6 @@ public class DeviceRates
 
     static string Entry(PreflightDevice device, DeviceReport report)
     {
-        if (report == null) return device.Name + " person 0";
         if (report.Error != null) return device.Name + " error " + report.Error;
         var rate = report.Seconds > 0 ? report.Count / report.Seconds : 0;
         return device.Name + " " + report.Measure + " " + rate.ToString("0.#", Preflight.Invariant);
@@ -420,12 +405,8 @@ public class DeviceRates
 [Description("From Go: counts each open device in turn, then asks the person about each device that needs it; gives the raw rows.")]
 public class RunCheck
 {
-    string notOpened = "speakerArray";
-    string questions = "speakerArray=Did each speaker play the test sound?;projectionCalibration=Does the test pattern fill the dome?";
+    string questions = "projectionCalibration=Does the test pattern fill the screen?";
     double seconds = 5;
-
-    /// <summary>Kinds with nothing to open, only a person's answer.</summary>
-    public string NotOpened { get { return notOpened; } set { notOpened = value; } }
 
     /// <summary>What a person is asked, by kind: kind=question, separated by ;.</summary>
     public string Questions { get { return questions; } set { questions = value; } }
@@ -438,7 +419,6 @@ public class RunCheck
     /// <summary>The check's states.</summary>
     public IObservable<CheckState> Process<TGo>(IObservable<PreflightDevice[]> devices, IObservable<DeviceReport> reports, IObservable<TGo> go, IObservable<string> confirms)
     {
-        var skip = Preflight.Kinds(NotOpened);
         var asked = new Dictionary<string, string>();
         foreach (var pair in (Questions ?? string.Empty).Split(';'))
         {
@@ -458,7 +438,7 @@ public class RunCheck
                 confirms.Subscribe(c => inbox.Add(c ?? string.Empty), fail));
             var thread = new Thread(() =>
             {
-                try { new Run(inbox, cancel.Token, observer, skip, asked, window).Check(); }
+                try { new Run(inbox, cancel.Token, observer, asked, window).Check(); }
                 catch (OperationCanceledException) { }
             });
             thread.IsBackground = true;
@@ -473,7 +453,6 @@ public class RunCheck
         readonly BlockingCollection<object> inbox;
         readonly CancellationToken token;
         readonly IObserver<CheckState> observer;
-        readonly HashSet<string> skip;
         readonly Dictionary<string, string> asked;
         readonly double window;
         readonly Dictionary<string, string> errors = new Dictionary<string, string>();
@@ -482,12 +461,11 @@ public class RunCheck
         bool went;
 
         public Run(BlockingCollection<object> inbox, CancellationToken token, IObserver<CheckState> observer,
-                   HashSet<string> skip, Dictionary<string, string> asked, double window)
+                   Dictionary<string, string> asked, double window)
         {
             this.inbox = inbox;
             this.token = token;
             this.observer = observer;
-            this.skip = skip;
             this.asked = asked;
             this.window = window;
         }
@@ -496,11 +474,10 @@ public class RunCheck
         {
             Send(null, string.Empty, string.Empty, false);
             while (list == null || !went) Next(Timeout.InfiniteTimeSpan);
-            var counted = list.Where(d => !skip.Contains(d.Kind)).ToList();
-            for (var i = 0; i < counted.Count; i++)
+            for (var i = 0; i < list.Length; i++)
             {
-                var device = counted[i];
-                Send(null, (i + 1).ToString(Preflight.Invariant) + "/" + counted.Count.ToString(Preflight.Invariant) + " " + device.Name, string.Empty, false);
+                var device = list[i];
+                Send(null, (i + 1).ToString(Preflight.Invariant) + "/" + list.Length.ToString(Preflight.Invariant) + " " + device.Name, string.Empty, false);
                 foreach (var row in Count(device.Name)) Send(row, null, null, false);
             }
             foreach (var device in list.Where(d => asked.ContainsKey(d.Kind)))

@@ -61,7 +61,7 @@
                 </Command>
                 <Command>
                   <Name>Confirm</Name>
-                  <Description>The person's answer for a device the check asks about, after Go: the text is the device and yes or no, such as SpeakerArray yes.</Description>
+                  <Description>The person's answer for a device the check asks about, after Go: the text is the device and yes or no, such as ProjectionCalibration yes.</Description>
                 </Command>
               </Commands>
             </Expression>
@@ -95,7 +95,7 @@
             </Expression>
             <Expression xsi:type="Combinator">
               <Combinator xsi:type="p1:PreflightDevices">
-                <p1:Kinds>behaviorBoard,timestampGeneratorGen3,stepperDriver,licketySplit,camera,speakerArray,projectionCalibration</p1:Kinds>
+                <p1:Kinds>behaviorBoard,timestampGeneratorGen3,stepperDriver,licketySplit,camera,projectionCalibration</p1:Kinds>
               </Combinator>
             </Expression>
             <Expression xsi:type="Combinator">
@@ -483,9 +483,7 @@
               <Name>DeviceReports</Name>
             </Expression>
             <Expression xsi:type="Combinator">
-              <Combinator xsi:type="p1:DeviceRates">
-                <p1:NotOpened>speakerArray</p1:NotOpened>
-              </Combinator>
+              <Combinator xsi:type="p1:DeviceRates" />
             </Expression>
             <Expression xsi:type="Combinator">
               <Combinator xsi:type="orcl:ReportMetric">
@@ -539,8 +537,7 @@
             </Expression>
             <Expression xsi:type="Combinator">
               <Combinator xsi:type="p1:RunCheck">
-                <p1:NotOpened>speakerArray</p1:NotOpened>
-                <p1:Questions>speakerArray=Did each speaker play the test sound?;projectionCalibration=Does the test pattern fill the dome?</p1:Questions>
+                <p1:Questions>projectionCalibration=Does the test pattern fill the screen?</p1:Questions>
                 <p1:Seconds>5</p1:Seconds>
               </Combinator>
             </Expression>

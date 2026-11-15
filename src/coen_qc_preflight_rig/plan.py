@@ -13,7 +13,6 @@ _FIELDS = {
     "stepperDriver": "stepper_driver",
     "licketySplit": "lickety_split",
     "camera": "camera",
-    "speakerArray": "speaker_array",
     "projectionCalibration": "projection_calibration",
 }
 
@@ -26,7 +25,7 @@ class Planned:
 
     @property
     def name(self) -> str:
-        """Camera-Body, as lib-open-rigs' RigDevices names it; SpeakerArray for a single section."""
+        """Camera-Body, as lib-open-rigs' RigDevices names it; ProjectionCalibration for a single section."""
         pascal = lambda s: s[:1].upper() + s[1:]  # noqa: E731
         return pascal(self.kind) + ("-" + pascal(self.instance) if self.instance else "")
 
