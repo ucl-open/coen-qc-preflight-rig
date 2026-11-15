@@ -7,12 +7,12 @@
                  xmlns:vid="clr-namespace:OpenRigs.Video;assembly=OpenRigs.Video"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
                  xmlns:io="clr-namespace:Bonsai.IO;assembly=Bonsai.System"
-                 xmlns:gl="clr-namespace:Bonsai.Shaders;assembly=Bonsai.Shaders"
-                 xmlns:res="clr-namespace:Bonsai.Resources;assembly=Bonsai.System"
+                 xmlns:orc="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
+                 xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The pre-training preflight (PROTOTYPE), run from rig-control's Preflight card. Ready mode: every device this machine's rig.yml declares is opened and kept open until Stop, its rate reported once a second as the devices metric; a behaviour board with trigger 0 enabled triggers the cameras (OpenRigs.Video TriggeredSpinnaker with rig.yml's exposure, gain, binning and pixelFormat, Mono8 when not set) at its frequency; the Pulse command pulses a behaviour board line. Go counts each device in turn (step metric), asks the person about each device that needs it (prompt metric, answered by Confirm), writes the raw rows (Device,Measure,Value,Detail) to RawFile and reports Finished. coen_qc_preflight_rig.judge applies the thresholds.</Description>
+  <Description>The pre-training preflight (PROTOTYPE), run from rig-control's Preflight card. Ready mode: every device this machine's rig.yml declares is opened and kept open until Stop, its rate reported once a second as the devices metric; a behaviour board with trigger 0 enabled triggers the cameras (OpenRigs.Video TriggeredSpinnaker with rig.yml's exposure, gain, binning and pixelFormat, Mono8 when not set) at its frequency; the Pulse command pulses a behaviour board line. Go counts each device in turn (step metric), asks the person about each device that needs it (prompt metric, answered by Confirm), writes the raw rows (device,measure,value,detail) to RawFile and reports Finished. coen_qc_preflight_rig.judge applies the thresholds.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -82,7 +82,7 @@
       </Expression>
       <Expression xsi:type="GroupWorkflow">
         <Name>Devices</Name>
-        <Description>Devices lists every entry the check covers, in rig.yml's order. Each SelectMany opens one branch per entry of its family and keeps the device open until Stop; DeviceMonitor reports what each sent every second, or its error, as DeviceReports.</Description>
+        <Description>Devices lists every entry the check covers, in rig.yml's order, from &lt;ConfigRoot&gt;\&lt;MACHINE&gt;\rig.yml (OpenRigs.Core ResolveRigConfigDirectory). Each SelectMany opens one branch per entry of its family and keeps the device open until Stop; DeviceMonitor reports what each sent every second, or its error, as DeviceReports.</Description>
         <Workflow>
           <Nodes>
             <Expression xsi:type="ExternalizedMapping">
@@ -95,7 +95,6 @@
             </Expression>
             <Expression xsi:type="Combinator">
               <Combinator xsi:type="p1:PreflightDevices">
-                <p1:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</p1:ConfigRoot>
                 <p1:Kinds>behaviorBoard,timestampGeneratorGen3,stepperDriver,licketySplit,camera,speakerArray,projectionCalibration</p1:Kinds>
               </Combinator>
             </Expression>
@@ -107,7 +106,6 @@
             </Expression>
             <Expression xsi:type="Combinator">
               <Combinator xsi:type="p1:PreflightDevices">
-                <p1:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</p1:ConfigRoot>
                 <p1:Kinds>behaviorBoard,timestampGeneratorGen3,stepperDriver,licketySplit</p1:Kinds>
               </Combinator>
             </Expression>
@@ -246,7 +244,6 @@
             </Expression>
             <Expression xsi:type="Combinator">
               <Combinator xsi:type="p1:PreflightDevices">
-                <p1:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</p1:ConfigRoot>
                 <p1:Kinds>camera</p1:Kinds>
               </Combinator>
             </Expression>
@@ -317,7 +314,6 @@
             </Expression>
             <Expression xsi:type="Combinator">
               <Combinator xsi:type="p1:PreflightDevices">
-                <p1:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</p1:ConfigRoot>
                 <p1:Kinds>projectionCalibration</p1:Kinds>
               </Combinator>
             </Expression>
@@ -337,85 +333,17 @@
                     <Property Name="Width" />
                     <Property Name="Height" />
                   </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="gl:CreateWindow">
-                      <gl:Width>1920</gl:Width>
-                      <gl:Height>1080</gl:Height>
-                      <gl:VSync>On</gl:VSync>
-                      <gl:SwapSync>false</gl:SwapSync>
-                      <gl:ClearColor>Gray</gl:ClearColor>
-                      <gl:ClearMask>DepthBufferBit ColorBufferBit</gl:ClearMask>
-                      <gl:CursorVisible>false</gl:CursorVisible>
-                      <gl:Location xsi:nil="true" />
-                      <gl:WindowBorder>Fixed</gl:WindowBorder>
-                      <gl:WindowState>Fullscreen</gl:WindowState>
-                      <gl:DisplayDevice>First</gl:DisplayDevice>
-                      <gl:TargetRenderFrequency>60</gl:TargetRenderFrequency>
-                      <gl:TargetUpdateFrequency>60</gl:TargetUpdateFrequency>
-                      <gl:RenderState />
-                      <gl:GraphicsMode>
-                        <gl:ColorFormat>
-                          <gl:Red>8</gl:Red>
-                          <gl:Green>8</gl:Green>
-                          <gl:Blue>8</gl:Blue>
-                          <gl:Alpha>8</gl:Alpha>
-                        </gl:ColorFormat>
-                        <gl:Depth>16</gl:Depth>
-                        <gl:Stencil>0</gl:Stencil>
-                        <gl:Samples>0</gl:Samples>
-                        <gl:AccumulatorFormat>
-                          <gl:Red>0</gl:Red>
-                          <gl:Green>0</gl:Green>
-                          <gl:Blue>0</gl:Blue>
-                          <gl:Alpha>0</gl:Alpha>
-                        </gl:AccumulatorFormat>
-                        <gl:Buffers>2</gl:Buffers>
-                        <gl:Stereo>false</gl:Stereo>
-                      </gl:GraphicsMode>
-                    </Combinator>
-                  </Expression>
-                  <Expression xsi:type="IncludeWorkflow" Path="BonVision:Primitives.BonVisionResources.bonsai" />
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="res:LoadResources" />
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="gl:RenderFrame" />
-                  </Expression>
-                  <Expression xsi:type="IncludeWorkflow" Path="BonVision:Environment.OrthographicView.bonsai">
-                    <Left>-135</Left>
-                    <Right>135</Right>
-                    <Bottom>-22.5</Bottom>
-                    <Top>82.5</Top>
-                  </Expression>
-                  <Expression xsi:type="rx:BehaviorSubject">
-                    <Name>ProjectionDraw</Name>
+                  <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Vision:ProjectorDisplay.bonsai">
+                    <DisplayDevice>First</DisplayDevice>
+                    <WindowState>Fullscreen</WindowState>
+                    <Width>1920</Width>
+                    <Height>1080</Height>
                   </Expression>
                   <Expression xsi:type="SubscribeSubject">
                     <Name>ProjectionEntry</Name>
                   </Expression>
-                  <Expression xsi:type="PropertyMapping">
-                    <PropertyMappings>
-                      <Property Name="FileName" Selector="MeshMapPath" />
-                    </PropertyMappings>
-                  </Expression>
-                  <Expression xsi:type="IncludeWorkflow" Path="BonVision:Environment.MeshMapping.bonsai">
-                    <ClearColor>Gray</ClearColor>
-                    <FileName />
-                  </Expression>
                   <Expression xsi:type="SubscribeSubject">
-                    <Name>ProjectionEntry</Name>
-                  </Expression>
-                  <Expression xsi:type="PropertyMapping">
-                    <PropertyMappings>
-                      <Property Name="GammaLut" Selector="GammaLutPath" />
-                    </PropertyMappings>
-                  </Expression>
-                  <Expression xsi:type="IncludeWorkflow" Path="BonVision:Environment.GammaCorrection.bonsai">
-                    <ClearColor>Gray</ClearColor>
-                    <GammaLut />
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>ProjectionDraw</Name>
+                    <Name>DrawStimuli</Name>
                   </Expression>
                   <Expression xsi:type="IncludeWorkflow" Path="BonVision:Primitives.DrawQuad.bonsai">
                     <ExtentX>120</ExtentX>
@@ -486,54 +414,31 @@
                   <Expression xsi:type="Combinator">
                     <Combinator xsi:type="rx:TakeUntil" />
                   </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>ProjectionClose</Name>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="rx:Delay">
-                      <rx:DueTime>PT1S</rx:DueTime>
-                    </Combinator>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="rx:TakeUntil" />
-                  </Expression>
                   <Expression xsi:type="Annotation">
                     <Name>Why CloseWhen, then TakeUntil</Name>
-                    <Text><![CDATA[The window is kept until the person's Confirm for it after Go, then closed in two steps. CloseWhen ends the render chain at its next frame, on the GL thread: ended from another thread, BonVision freed its GL resources off that thread while the chain was still drawing (AccessViolationException at the end of 1 run in 5 on PIPOFFICERIG, 7 Nov 2026). The window and the draw branch are taken until 1 s later, once the chain has stopped. A Stop before then (before Go, or before the answer) still tears it all down from the control server's thread.]]></Text>
+                    <Text><![CDATA[The window is kept until the person's Confirm for it after Go. CloseWhen then ends ProjectorDisplay at its next frame, on the GL thread, and ProjectorDisplay frees BonVision's GL resources on its render thread (DisposeOnRenderThread), as it does at a Stop from the control server's thread. The test pattern's draw branch is taken until 1 s later, once the window has gone.]]></Text>
                   </Expression>
                 </Nodes>
                 <Edges>
                   <Edge From="0" To="1" Label="Source1" />
-                  <Edge From="2" To="3" Label="Source1" />
-                  <Edge From="3" To="4" Label="Source1" />
-                  <Edge From="4" To="5" Label="Source1" />
-                  <Edge From="5" To="32" Label="Source1" />
-                  <Edge From="6" To="7" Label="Source1" />
+                  <Edge From="5" To="6" Label="Source1" />
+                  <Edge From="6" To="22" Label="Source1" />
                   <Edge From="7" To="8" Label="Source1" />
-                  <Edge From="8" To="11" Label="Source1" />
+                  <Edge From="8" To="12" Label="Source3" />
                   <Edge From="9" To="10" Label="Source1" />
-                  <Edge From="10" To="11" Label="Source2" />
-                  <Edge From="11" To="14" Label="Source1" />
+                  <Edge From="10" To="12" Label="Source1" />
+                  <Edge From="11" To="12" Label="Source2" />
                   <Edge From="12" To="13" Label="Source1" />
-                  <Edge From="13" To="14" Label="Source2" />
-                  <Edge From="14" To="25" Label="Source1" />
-                  <Edge From="15" To="16" Label="Source1" />
-                  <Edge From="16" To="35" Label="Source1" />
-                  <Edge From="17" To="18" Label="Source1" />
-                  <Edge From="18" To="22" Label="Source3" />
-                  <Edge From="19" To="20" Label="Source1" />
-                  <Edge From="20" To="22" Label="Source1" />
+                  <Edge From="14" To="15" Label="Source2" />
+                  <Edge From="15" To="18" Label="Source1" />
+                  <Edge From="16" To="17" Label="Source1" />
+                  <Edge From="17" To="18" Label="Source2" />
+                  <Edge From="18" To="19" Label="Source1" />
+                  <Edge From="20" To="21" Label="Source1" />
                   <Edge From="21" To="22" Label="Source2" />
-                  <Edge From="22" To="23" Label="Source1" />
-                  <Edge From="24" To="25" Label="Source2" />
-                  <Edge From="25" To="28" Label="Source1" />
-                  <Edge From="26" To="27" Label="Source1" />
-                  <Edge From="27" To="28" Label="Source2" />
-                  <Edge From="28" To="29" Label="Source1" />
-                  <Edge From="30" To="31" Label="Source1" />
-                  <Edge From="31" To="32" Label="Source2" />
-                  <Edge From="33" To="34" Label="Source1" />
-                  <Edge From="34" To="35" Label="Source2" />
+                  <Edge From="4" To="3" Label="Source1" />
+                  <Edge From="2" To="3" Label="Source2" />
+                  <Edge From="3" To="15" Label="Source1" />
                 </Edges>
               </Workflow>
             </Expression>
@@ -543,12 +448,13 @@
             <Expression xsi:type="rx:PublishSubject">
               <Name>DeviceReports</Name>
             </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="orc:ResolveRigConfigDirectory">
+                <orc:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</orc:ConfigRoot>
+              </Combinator>
+            </Expression>
           </Nodes>
           <Edges>
-            <Edge From="0" To="2" Label="Source1" />
-            <Edge From="0" To="5" Label="Source1" />
-            <Edge From="0" To="7" Label="Source1" />
-            <Edge From="0" To="9" Label="Source1" />
             <Edge From="2" To="3" Label="Source1" />
             <Edge From="3" To="4" Label="Source1" />
             <Edge From="5" To="6" Label="Source1" />
@@ -559,6 +465,11 @@
             <Edge From="8" To="11" Label="Source2" />
             <Edge From="10" To="11" Label="Source3" />
             <Edge From="11" To="12" Label="Source1" />
+            <Edge From="0" To="13" Label="Source1" />
+            <Edge From="13" To="2" Label="Source1" />
+            <Edge From="13" To="5" Label="Source1" />
+            <Edge From="13" To="7" Label="Source1" />
+            <Edge From="13" To="9" Label="Source1" />
           </Edges>
         </Workflow>
       </Expression>
@@ -672,13 +583,15 @@
             <Expression xsi:type="Combinator">
               <Combinator xsi:type="p1:RowsOf" />
             </Expression>
-            <Expression xsi:type="io:CsvWriter">
+            <Expression xsi:type="orl:CsvWriter">
               <io:FileName>preflight-raw.csv</io:FileName>
               <io:Append>false</io:Append>
               <io:Overwrite>true</io:Overwrite>
               <io:Suffix>None</io:Suffix>
               <io:IncludeHeader>true</io:IncludeHeader>
               <io:Selector />
+              <orl:AutoFlush>false</orl:AutoFlush>
+              <orl:PublishRows>false</orl:PublishRows>
             </Expression>
             <Expression xsi:type="SubscribeSubject">
               <Name>CheckEvents</Name>

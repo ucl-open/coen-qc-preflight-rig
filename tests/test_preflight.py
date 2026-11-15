@@ -48,7 +48,7 @@ def test_a_wrong_device_entry_is_refused(tmp_path):
 
 def _raw(tmp_path, rows):
     f = tmp_path / "raw.csv"
-    f.write_text("Device,Measure,Value,Detail\n" + "".join(",".join(r) + "\n" for r in rows), encoding="utf-8")
+    f.write_text("device,measure,value,detail\n" + "".join(",".join(r) + "\n" for r in rows), encoding="utf-8")
     return f
 
 

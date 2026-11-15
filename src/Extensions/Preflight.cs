@@ -6,14 +6,15 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reactive.Concurrency;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Threading.Tasks;
 using Bonsai;
 using Bonsai.Harp;
+using OpenRigs.Devices;
 using YamlDotNet.RepresentationModel;
 
 // PROTOTYPE (7 Nov 2026): if the one-workflow design holds on a rig, PreflightDevices belongs beside
@@ -66,17 +67,17 @@ public class PreflightDevice
     public double MaximumRunCurrent { get; set; }
 }
 
-/// <summary>One raw measurement, a row of the check's CSV: Device,Measure,Value,Detail.</summary>
+/// <summary>One raw measurement, a row of the check's CSV: device,measure,value,detail (camelCase, the lab's column names).</summary>
 public class PreflightRow
 {
     /// <summary>The device's name.</summary>
-    public string Device { get; set; }
+    public string device { get; set; }
     /// <summary>What was measured: messages, frames, seconds, person, error.</summary>
-    public string Measure { get; set; }
+    public string measure { get; set; }
     /// <summary>The number measured.</summary>
-    public string Value { get; set; }
+    public string value { get; set; }
     /// <summary>An error's message, with no commas, semicolons or line breaks.</summary>
-    public string Detail { get; set; }
+    public string detail { get; set; }
 }
 
 /// <summary>What an open device sent in one interval of about a second, or why it failed.</summary>
@@ -143,29 +144,22 @@ static class Preflight
 
 /// <summary>The rig.yml entries of the kinds named, in file order; nothing when the rig declares none of them.</summary>
 [Combinator]
-[WorkflowElementCategory(ElementCategory.Source)]
-[Description("The rig.yml entries of the kinds named, in file order; nothing when the rig declares none of them.")]
+[WorkflowElementCategory(ElementCategory.Transform)]
+[Description("The entries of the kinds named in rig.yml in the input folder (OpenRigs.Core ResolveRigConfigDirectory), in file order; nothing when the rig declares none of them.")]
 public class PreflightDevices
 {
-    string configRoot = @"C:\Coen-Lab-Local\RigConfigs";
-
-    /// <summary>The folder holding &lt;MACHINE&gt;\rig.yml.</summary>
-    [Description("The folder holding <MACHINE>\\rig.yml.")]
-    public string ConfigRoot { get { return configRoot; } set { configRoot = value; } }
-
     /// <summary>The rig.yml keys to list, separated by commas, such as camera.</summary>
     [Description("The rig.yml keys to list, separated by commas, such as camera.")]
     public string Kinds { get; set; }
 
-    /// <summary>Reads rig.yml when subscribed; a missing or unreadable rig.yml is an error: the check cannot run.</summary>
-    public IObservable<PreflightDevice> Process()
+    /// <summary>Reads rig.yml in each folder; a missing or unreadable rig.yml is an error: the check cannot run.</summary>
+    public IObservable<PreflightDevice> Process(IObservable<string> source)
     {
-        return Observable.Defer(() => Read().ToObservable());
+        return source.SelectMany(directory => Read(Path.Combine(directory, "rig.yml")));
     }
 
-    List<PreflightDevice> Read()
+    List<PreflightDevice> Read(string path)
     {
-        var path = Path.Combine(Environment.ExpandEnvironmentVariables(ConfigRoot), Environment.MachineName, "rig.yml");
         if (!File.Exists(path)) throw new FileNotFoundException("The preflight needs a rig.yml, and there is none at " + path, path);
         var yaml = new YamlStream();
         using (var reader = new StreamReader(path)) yaml.Load(reader);
@@ -580,14 +574,14 @@ public class RunCheck
 
         void Send(PreflightRow row, string step, string prompt, bool done)
         {
-            if (row != null) Console.Error.WriteLine("preflight: " + row.Device + " " + row.Measure + " " + row.Value + " " + row.Detail);
+            if (row != null) Console.Error.WriteLine("preflight: " + row.device + " " + row.measure + " " + row.value + " " + row.detail);
             observer.OnNext(new CheckState { Row = row, Step = step, Prompt = prompt, Done = done });
         }
     }
 
     static PreflightRow Row(string device, string measure, string value, string detail)
     {
-        return new PreflightRow { Device = device, Measure = measure, Value = value, Detail = detail };
+        return new PreflightRow { device = device, measure = measure, value = value, detail = detail };
     }
 }
 
@@ -720,9 +714,6 @@ public class BoardWrites
     const int AccumulatedStepsSamplingRate = 73;
     const int Motor0MoveRelative = 81;
     const int Motor0MoveAbsolute = 86;  // S32, steps from home
-    const int DigitalInputState = 78;
-    const int Motor0AccumulatedSteps = 91;
-    const int StopMotors = 110;
 
     /// <summary>The board's writes when it opens, then those for each Pulse and Reset command (a behaviour board), or Move and Home command (a stepper driver), to it.</summary>
     public IObservable<HarpMessage> Process(IObservable<string> pulses, IObservable<string> moves, IObservable<string> homes, IObservable<string> resets)
@@ -865,82 +856,36 @@ public class BoardWrites
         });
     }
 
-    // The driver's digital inputs as it last said them (DigitalInputState bits, Input0 = 1); -1 before it has.
-    class Inputs
-    {
-        public int Bits = -1;
-    }
-
-    // Home <Device> <Motor>, such as StepperDriver-A Motor1: as av-dome zeroes a motor (ZEROingMotors.bonsai). Off its
-    // home switch first if on it (1000 steps at a time), then towards zero until the switch stops it
-    // (StopMotor<n>OnFalling, set at open), then its position set to 0. Only a motor whose input the wiring names too.
+    // Home <Device> <Motor>, such as StepperDriver-A Motor1: OpenRigs.Devices HomeLickSpoutMotor, as the dome
+    // tasks' lick spout stage homes a motor: off its home switch first if on it, then towards zero until the
+    // switch stops it (StopMotor<n>OnFalling, set at open), then its position set to 0. Only a motor whose input
+    // the wiring names too. Not homed within 60 s: said on stderr and the motor stopped, the check going on.
     IObservable<HarpMessage> Homes(IObservable<string> homes)
     {
         var name = Device;
         var wired = WiredMotors & WiredInputs;
-        return Observable.Create<HarpMessage>(observer =>
+        var driver = LickSpoutDriver.A;
+        var stage = name != null && name.StartsWith("StepperDriver-", StringComparison.Ordinal)
+            && Enum.TryParse(name.Substring("StepperDriver-".Length), false, out driver);
+        return homes.SelectMany(text =>
         {
-            var inputs = new Inputs();
-            var watch = DeviceHub<HarpMessage>.Items
-                .Where(item => item.Item1 == name && item.Item2.Address == DigitalInputState && item.Item2.MessageType != MessageType.Write)
-                .Subscribe(item => Volatile.Write(ref inputs.Bits, item.Item2.GetPayloadByte()));
-            var runs = homes.SelectMany(text =>
+            var parts = (text ?? string.Empty).Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 2 || parts[0] != name) return Observable.Empty<HarpMessage>();
+            int n;
+            var motor = parts[1].ToLowerInvariant();
+            if (!stage || !motor.StartsWith("motor") || !int.TryParse(motor.Substring(5), out n) || n < 0 || n > 3 || (wired & (1 << n)) == 0)
             {
-                var parts = (text ?? string.Empty).Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length != 2 || parts[0] != name) return Observable.Empty<HarpMessage>();
-                int n;
-                var motor = parts[1].ToLowerInvariant();
-                if (!motor.StartsWith("motor") || !int.TryParse(motor.Substring(5), out n) || n < 0 || n > 3 || (wired & (1 << n)) == 0)
+                Console.Error.WriteLine("preflight: Home '" + text + "' ignored: give a lick spout driver (StepperDriver-A or -B) and a motor whose motor and input its wiring names");
+                return Observable.Empty<HarpMessage>();
+            }
+            var events = DeviceHub<HarpMessage>.Items.Where(item => item.Item1 == name).Select(item => item.Item2);
+            return HomeLickSpoutMotor.Home(events, driver, n, TimeSpan.FromSeconds(60), DefaultScheduler.Instance)
+                .Do(_ => { }, () => Console.Error.WriteLine("preflight: " + name + " Motor" + n + " homed"))
+                .Catch<HarpMessage, TimeoutException>(error =>
                 {
-                    Console.Error.WriteLine("preflight: Home '" + text + "' ignored: give the driver and a motor whose motor and input its wiring names");
-                    return Observable.Empty<HarpMessage>();
-                }
-                return Home(name, n, inputs);
-            }).Subscribe(observer);
-            return new CompositeDisposable(watch, runs);
-        });
-    }
-
-    static IObservable<HarpMessage> Home(string device, int n, Inputs inputs)
-    {
-        return Observable.Create<HarpMessage>(async (observer, token) =>
-        {
-            var bit = 1 << n;
-            Func<int> bits = () => Volatile.Read(ref inputs.Bits);
-            var clock = Stopwatch.StartNew();
-            // Asked, as av-dome asks for them at start: the first state may have come before this listened.
-            if (bits() < 0) observer.OnNext(HarpMessage.FromByte(DigitalInputState, MessageType.Read, 0));
-            while (bits() < 0 && clock.Elapsed < TimeSpan.FromSeconds(2)) await Task.Delay(50, token);
-            if (bits() < 0)
-            {
-                Console.Error.WriteLine("preflight: " + device + " Motor" + n + " not homed: the driver has not said its inputs");
-                return;
-            }
-            for (var i = 0; i < 10 && (bits() & bit) == 0; i++)
-            {
-                observer.OnNext(HarpMessage.FromInt32(Motor0MoveRelative + n, MessageType.Write, 1000));
-                await Task.Delay(1000, token);
-            }
-            if ((bits() & bit) == 0)
-            {
-                Console.Error.WriteLine("preflight: " + device + " Motor" + n + " not homed: still on its home switch after 10000 steps off it");
-                return;
-            }
-            observer.OnNext(HarpMessage.FromInt32(Motor0MoveRelative + n, MessageType.Write, -100000));
-            clock.Restart();
-            while ((bits() & bit) != 0)
-            {
-                if (clock.Elapsed > TimeSpan.FromSeconds(60))
-                {
-                    observer.OnNext(HarpMessage.FromByte(StopMotors, MessageType.Write, (byte)bit));
-                    Console.Error.WriteLine("preflight: " + device + " Motor" + n + " not homed: its home switch was not reached in 60 s, so it was stopped");
-                    return;
-                }
-                await Task.Delay(20, token);
-            }
-            await Task.Delay(200, token);
-            observer.OnNext(HarpMessage.FromInt32(Motor0AccumulatedSteps + n, MessageType.Write, 0));
-            Console.Error.WriteLine("preflight: " + device + " Motor" + n + " homed");
+                    Console.Error.WriteLine("preflight: " + name + " Motor" + n + " not homed: " + error.Message + " It was stopped.");
+                    return Observable.Return(Harp.StepperDriver.StopMotors.FromPayload(MessageType.Write, (Harp.StepperDriver.StepperMotors)(1 << n)));
+                });
         });
     }
 

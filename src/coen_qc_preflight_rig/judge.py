@@ -1,6 +1,6 @@
 """Whether a rig passed: the workflow's raw measurements against config/thresholds.yml.
 
-The workflow writes one row per measurement, `Device,Measure,Value,Detail`: a device that failed to open
+The workflow writes one row per measurement, `device,measure,value,detail`: a device that failed to open
 writes `error` with the message; a Harp board `messages` and `seconds`; a camera `frames` and `seconds`;
 a section a person confirms `person` (1 yes, 0 no). Every device rig.yml declares must report, and
 nothing else may: a missing or extra device fails the check, so a workflow that starts the wrong
@@ -25,7 +25,7 @@ def read_raw(path: Path) -> dict[str, dict[str, tuple[str, str]]]:
     rows: dict[str, dict[str, tuple[str, str]]] = {}
     with open(path, newline="", encoding="utf-8-sig") as f:
         for row in csv.DictReader(f):
-            rows.setdefault(row["Device"], {})[row["Measure"]] = (row.get("Value") or "", row.get("Detail") or "")
+            rows.setdefault(row["device"], {})[row["measure"]] = (row.get("value") or "", row.get("detail") or "")
     return rows
 
 
