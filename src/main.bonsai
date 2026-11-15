@@ -30,7 +30,7 @@
       </Expression>
       <Expression xsi:type="GroupWorkflow">
         <Name>Initialization</Name>
-        <Description>The experiment controller (OpenRigs.Control, ExperimentControl, TCP 5561 on this machine): commands Pulse and Confirm; Recording at Go.</Description>
+        <Description>The experiment controller (OpenRigs.Control, ExperimentControl, TCP 5561 on this machine): commands Pulse, Reset, Move, Home and Confirm; Recording at Go.</Description>
         <Workflow>
           <Nodes>
             <Expression xsi:type="ExternalizedMapping">

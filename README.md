@@ -2,7 +2,7 @@
 
 The Coen Lab's pre-training preflight: one Bonsai workflow for every rig, checking that each device the rig's `rig.yml` declares works. rig-control refuses a launch (the `test` mouse aside) without a pass in the last 18 h, once its agent runs with `--preflight`.
 
-**Prototype (7 Nov 2026).** Run headless on PIPOFFICERIG only; not yet on a rig, and not in rig-setup's Repos.
+**Prototype (7 Nov 2026).** Run headless on PIPOFFICERIG only; not yet on a rig. It is in `K:\config\profile-repos.json`, so app-rig-setup's `workflows\update-workflows.ps1` bumps its packages.
 
 ## How it works
 
@@ -17,6 +17,8 @@ Run from rig-control's Preflight card through `OpenRigs.Control`'s `ExperimentCo
 - **Ready**: once every device has opened (sent something, or 5 s without failing) or failed, phase `Ready`, and from then the `devices` metric once a second: `;`-separated `<Device> <measure> <rate>` (per second over the last second, such as `Camera-Body frames 59.9`) or `<Device> error <detail>`, in rig.yml's order; a speaker array reads `SpeakerArray person 0`.
 - Command `Pulse` (`BehaviorBoard-Main DO1`, any time): one pulse of the line's `pulseWidthMs` in rig.yml, else 50 ms, or of a width in ms given third, 1 to 60000 (`BehaviorBoard-Main DO1 10000`, rig-control's Flush). Behaviour boards only; lines DO0-DO3, timed by the board (its `PulseDO` width and `OutputPulseEnable`, cleared as the workflow opens, so a pulse ends even if the workflow stops), and DOPort0-DOPort2, set and cleared from the PC. `scripts\test-pulse.ps1` checks the writes.
 - Command `Reset` (empty for every board, or a board's name): each DO line closed at once (DO0 left to the camera trigger when it runs), each line's `PulseDO` width and `OutputPulseEnable` put back as rig.yml's `pulseController` has them. rig-control's End Testing, and closing its Preflight page, send it before the stop.
+- Command `Move` (`StepperDriver-A Motor1 -150`): steps a stepper driver motor that rig.yml's wiring names, from where it is.
+- Command `Home` (`StepperDriver-A Motor1`): zeroes a stepper driver motor as the lab's dome workflows do, off its home switch if on it, then towards zero until the switch stops it, then its position set to 0.
 - **Check**, from Go (`Recording`): each open device counted in turn for 5 s from its reports, nothing reopened (`step` metric `<n>/<total> <Device>`); then each device a person confirms asked in turn (`prompt` metric `<Device>: <question>`, empty otherwise) until `Confirm` (`<Device> yes` or `<Device> no`; the first after Go is kept). Rows go to the `RawFile` launch property (`device,measure,value,detail`, OpenRigs.Logging's `CsvWriter`) and to stderr; the file is closed, then `Finished` 1.5 s later.
 - `coen_qc_preflight_rig.judge` (Bonsai measures, Python computes) applies `config\thresholds.yml` and writes the pass record rig-control reads: `<RigConfigs>\<RIG>\preflight\last.json`. Every declared device must report, and nothing else may.
 
@@ -33,5 +35,4 @@ uv run --project <rig-control> rig-control status|go|command|stop localhost --po
 - A test sound for the speaker question: the workflow asks it but plays nothing.
 - Other checks a person confirms (a drop seen at each reward valve, the wheel turned and counted).
 - Thresholds set on a rig.
-- rig-setup's Repos, which also puts it under lib-open-rigs' update-workflows; until then its `local_packages` are the lab's as of 7 Nov 2026.
 - `PreflightDevices` and `CheckDevice` moved into lib-open-rigs with tests, if the design holds on a rig.
