@@ -12,7 +12,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 THRESHOLDS = Path(__file__).parents[1] / "config" / "thresholds.yml"
 DOME = ["BehaviorBoard-Main", "TimestampGeneratorGen3-Main", "StepperDriver-A", "StepperDriver-B",
         "LicketySplit-Left", "LicketySplit-Right", "Camera-Face", "Camera-Pupil", "Camera-Body",
-        "ProjectionCalibration"]
+        "SpeakerArray", "ProjectionCalibration"]
 
 
 @pytest.mark.parametrize("name", ["GREEN-DOME-1", "BLUE-OPTO-1", "BLUE-OPTO-2"])
@@ -98,7 +98,7 @@ def test_a_device_rig_yml_does_not_declare_fails(tmp_path):
 def _dome(tmp_path, projection):
     rows = [(d, "messages", "9", "") for d in DOME[:6]] + \
            [(d, m, v, "") for d in DOME[6:9] for m, v in (("frames", "250"), ("seconds", "5"))] + \
-           [("ProjectionCalibration", m, v, "") for m, v in projection]
+           [("SpeakerArray", "person", "1", "")] + [("ProjectionCalibration", m, v, "") for m, v in projection]
     record = judge.judge(FIXTURES / "GREEN-DOME-1.yml", _raw(tmp_path, rows), THRESHOLDS, "GREEN-DOME-1", "abc")
     return {d["device"]: d["why"] for d in record["devices"] if not d["ok"]}
 
@@ -107,6 +107,35 @@ def test_a_section_a_person_confirms(tmp_path):
     assert _dome(tmp_path, [("frames", "300"), ("seconds", "5"), ("person", "0")]) == \
         {"ProjectionCalibration": "not confirmed by the person"}
     assert _dome(tmp_path, [("frames", "300"), ("seconds", "5"), ("person", "1")]) == {}
+
+
+def test_speakers_not_heard_fail(tmp_path):
+    rows = [(d, "messages", "9", "") for d in DOME[:6]] + \
+           [(d, m, v, "") for d in DOME[6:9] for m, v in (("frames", "250"), ("seconds", "5"))] + \
+           [("SpeakerArray", "person", "0", "")] + [("ProjectionCalibration", m, v, "") for m, v in (("frames", "300"), ("seconds", "5"), ("person", "1"))]
+    record = judge.judge(FIXTURES / "GREEN-DOME-1.yml", _raw(tmp_path, rows), THRESHOLDS, "GREEN-DOME-1", "abc")
+    assert [(d["device"], d["why"]) for d in record["devices"] if not d["ok"]] == [("SpeakerArray", "not confirmed by the person")]
+
+
+WORKFLOW = (Path(__file__).parents[1] / "src" / "main.bonsai").read_text(encoding="utf-8-sig")
+
+
+def test_each_speaker_plays_a_test_sound_through_the_lab_s_mixer_before_the_question():
+    # Pip, 15 Nov 2026: each rig.yml speaker plays a test sound through lib's SpeakerMixer at lib's default level
+    # (SpeakerBuffer's -30 dBFS RMS), on its channel alone; only a rig with a speakerArray (PreflightDevices Kinds
+    # speakerArray, so a box is neither played to nor asked), from the speaker question until its Confirm.
+    import xml.etree.ElementTree as ET
+
+    w, xsi = "{https://bonsai-rx.org/2018/workflow}", "{http://www.w3.org/2001/XMLSchema-instance}type"
+    root = ET.fromstring(WORKFLOW.encode("utf-8"))
+    test = next(e for e in root.iter(w + "Expression") if e.findtext(w + "Name") == "SpeakerTest")
+    text = ET.tostring(test, encoding="unicode")
+    assert 'Path="OpenRigs.Audio:SpeakerMixer.bonsai"' in text and WORKFLOW.count("OpenRigs.Audio:SpeakerMixer.bonsai") == 1
+    assert [k.text for k in test.iter("{clr-namespace:;assembly=Extensions}Kinds")] == ["speakerArray"]
+    buffers = [c for c in test.iter(w + "Combinator") if c.get(xsi) == "aud:SpeakerBuffer"]
+    assert len(buffers) == 1 and buffers[0].findtext("{clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio}LevelDbfs") == "-30"
+    assert 'Prompt.StartsWith("SpeakerArray:")' in text and "<p1:Device>SpeakerArray</p1:Device>" in WORKFLOW
+    assert "speakerArray=Did each speaker play the test sound?" in WORKFLOW and "<p1:NotOpened>speakerArray</p1:NotOpened>" in WORKFLOW
 
 
 def test_a_slow_projector_fails_whatever_the_person_says(tmp_path):

@@ -13,7 +13,7 @@ from open_rigs.rigs.lab_rig import LabRig
 # The keyed sections, in the order the check runs them, by their rig.yml key.
 DEVICE_KINDS = ("behaviorBoard", "timestampGeneratorGen3", "stepperDriver", "licketySplit", "camera")
 # The single sections that turn a check on when present.
-SINGLE_SECTIONS = ("projectionCalibration",)
+SINGLE_SECTIONS = ("speakerArray", "projectionCalibration")
 
 
 def load(path: Path) -> LabRig:

@@ -11,8 +11,12 @@
                  xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
+                 xmlns:aud="clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio"
+                 xmlns:dsp="clr-namespace:Bonsai.Dsp;assembly=Bonsai.Dsp"
+                 xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
+                 xmlns:sys="clr-namespace:System;assembly=mscorlib"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The pre-training preflight (PROTOTYPE), run from rig-control's Preflight card. Ready mode: every device this machine's rig.yml declares is opened and kept open until Stop, its rate reported once a second as the devices metric; a behaviour board with trigger 0 enabled triggers the cameras (OpenRigs.Video TriggeredSpinnaker with rig.yml's exposure, gain, binning and pixelFormat, Mono8 when not set) at its frequency; the Pulse command pulses a behaviour board line. Go counts each device in turn (step metric), asks the person about each device that needs it (prompt metric, answered by Confirm), writes the raw rows (device,measure,value,detail) to RawFile and reports Finished. coen_qc_preflight_rig.judge applies the thresholds.</Description>
+  <Description>The pre-training preflight (PROTOTYPE), run from rig-control's Preflight card. Ready mode: every device this machine's rig.yml declares is opened and kept open until Stop, its rate reported once a second as the devices metric; a behaviour board with trigger 0 enabled triggers the cameras (OpenRigs.Video TriggeredSpinnaker with rig.yml's exposure, gain, binning and pixelFormat, Mono8 when not set) at its frequency; the Pulse command pulses a behaviour board line. Go counts each device in turn (step metric), asks the person about each device that needs it (prompt metric, answered by Confirm; each rig.yml speaker plays a test sound while its question is asked, SpeakerTest), writes the raw rows (device,measure,value,detail) to RawFile and reports Finished. coen_qc_preflight_rig.judge applies the thresholds.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -61,7 +65,7 @@
                 </Command>
                 <Command>
                   <Name>Confirm</Name>
-                  <Description>The person's answer for a device the check asks about, after Go: the text is the device and yes or no, such as ProjectionCalibration yes.</Description>
+                  <Description>The person's answer for a device the check asks about, after Go: the text is the device and yes or no, such as SpeakerArray yes.</Description>
                 </Command>
               </Commands>
             </Expression>
@@ -95,7 +99,7 @@
             </Expression>
             <Expression xsi:type="Combinator">
               <Combinator xsi:type="p1:PreflightDevices">
-                <p1:Kinds>behaviorBoard,timestampGeneratorGen3,stepperDriver,licketySplit,camera,projectionCalibration</p1:Kinds>
+                <p1:Kinds>behaviorBoard,timestampGeneratorGen3,stepperDriver,licketySplit,camera,speakerArray,projectionCalibration</p1:Kinds>
               </Combinator>
             </Expression>
             <Expression xsi:type="Combinator">
@@ -483,7 +487,9 @@
               <Name>DeviceReports</Name>
             </Expression>
             <Expression xsi:type="Combinator">
-              <Combinator xsi:type="p1:DeviceRates" />
+              <Combinator xsi:type="p1:DeviceRates">
+                <p1:NotOpened>speakerArray</p1:NotOpened>
+              </Combinator>
             </Expression>
             <Expression xsi:type="Combinator">
               <Combinator xsi:type="orcl:ReportMetric">
@@ -537,7 +543,8 @@
             </Expression>
             <Expression xsi:type="Combinator">
               <Combinator xsi:type="p1:RunCheck">
-                <p1:Questions>projectionCalibration=Does the test pattern fill the screen?</p1:Questions>
+                <p1:NotOpened>speakerArray</p1:NotOpened>
+                <p1:Questions>speakerArray=Did each speaker play the test sound?;projectionCalibration=Does the test pattern fill the screen?</p1:Questions>
                 <p1:Seconds>5</p1:Seconds>
               </Combinator>
             </Expression>
@@ -709,6 +716,265 @@
       </Expression>
       <Expression xsi:type="rx:PublishSubject">
         <Name>StepperDriver-B.Data</Name>
+      </Expression>
+      <Expression xsi:type="GroupWorkflow">
+        <Name>SpeakerTest</Name>
+        <Description>Only for a rig whose rig.yml has a speakerArray: the lab's speaker mixer (OpenRigs.Audio SpeakerMixer: Speakers, every filter checked, and the mixer started no sooner than 3 s after Start), and a test sound for each speaker, laid out by OpenRigs.Audio SpeakerBuffer on that speaker's channel alone, equalised, at the lab's default level (SpeakerBuffer's LevelDbfs, -30 dBFS RMS). Once the check asks "SpeakerArray: Did each speaker play the test sound?", the speakers play their test sound in rig.yml's order, one after another, every 5 s until the person's Confirm for SpeakerArray. The test sound is a 0.3 s 1 kHz tone then 0.3 s of silence (Bonsai.Dsp FunctionGenerator at 48 kHz).</Description>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>RigConfigs</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="p1:PreflightDevices">
+                <p1:Kinds>speakerArray</p1:Kinds>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="rx:SelectMany">
+              <Name>SpeakerArray</Name>
+              <Workflow>
+                <Nodes>
+                  <Expression xsi:type="WorkflowInput">
+                    <Name>Source1</Name>
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>RigConfigDirectory</Name>
+                  </Expression>
+                  <Expression xsi:type="scr:ExpressionTransform">
+                    <scr:Expression>it + "\\rig.yml"</scr:Expression>
+                  </Expression>
+                  <Expression xsi:type="rx:AsyncSubject">
+                    <Name>RigFile</Name>
+                  </Expression>
+                  <Expression xsi:type="rx:ReplaySubject" TypeArguments="sys:String">
+                    <rx:Name>ReadyStages</rx:Name>
+                  </Expression>
+                  <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Audio:SpeakerMixer.bonsai" />
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="dsp:FunctionGenerator">
+                      <dsp:BufferLength>14400</dsp:BufferLength>
+                      <dsp:Frequency>1000</dsp:Frequency>
+                      <dsp:Waveform>Sine</dsp:Waveform>
+                      <dsp:SampleRate>48000</dsp:SampleRate>
+                      <dsp:Depth>F32</dsp:Depth>
+                      <dsp:Amplitude>1</dsp:Amplitude>
+                      <dsp:Offset>0</dsp:Offset>
+                      <dsp:Phase>0</dsp:Phase>
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="dsp:FunctionGenerator">
+                      <dsp:BufferLength>14400</dsp:BufferLength>
+                      <dsp:Frequency>1000</dsp:Frequency>
+                      <dsp:Waveform>Sine</dsp:Waveform>
+                      <dsp:SampleRate>48000</dsp:SampleRate>
+                      <dsp:Depth>F32</dsp:Depth>
+                      <dsp:Amplitude>0</dsp:Amplitude>
+                      <dsp:Offset>0</dsp:Offset>
+                      <dsp:Phase>0</dsp:Phase>
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="rx:Zip" />
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="dsp:Concat">
+                      <dsp:Axis>1</dsp:Axis>
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="rx:AsyncSubject">
+                    <Name>TestTone</Name>
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>Speakers</Name>
+                  </Expression>
+                  <Expression xsi:type="MemberSelector">
+                    <Selector>Speakers</Selector>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="rx:Merge" />
+                  </Expression>
+                  <Expression xsi:type="rx:SelectMany">
+                    <Name>TestSound</Name>
+                    <Description>One speaker's test sound: SpeakerBuffer on its channel alone, equalised for it, at the lab's default level.</Description>
+                    <Workflow>
+                      <Nodes>
+                        <Expression xsi:type="WorkflowInput">
+                          <Name>Source1</Name>
+                        </Expression>
+                        <Expression xsi:type="MemberSelector">
+                          <Selector>Channel</Selector>
+                        </Expression>
+                        <Expression xsi:type="Combinator">
+                          <Combinator xsi:type="rx:ToArray" />
+                        </Expression>
+                        <Expression xsi:type="SubscribeSubject">
+                          <Name>Speakers</Name>
+                        </Expression>
+                        <Expression xsi:type="SubscribeSubject">
+                          <Name>TestTone</Name>
+                        </Expression>
+                        <Expression xsi:type="Combinator">
+                          <Combinator xsi:type="rx:Zip" />
+                        </Expression>
+                        <Expression xsi:type="Combinator">
+                          <Combinator xsi:type="rx:Zip" />
+                        </Expression>
+                        <Expression xsi:type="InputMapping">
+                          <PropertyMappings>
+                            <Property Name="Channels" Selector="Item1" />
+                          </PropertyMappings>
+                          <Selector>Item2</Selector>
+                        </Expression>
+                        <Expression xsi:type="Combinator">
+                          <Combinator xsi:type="aud:SpeakerBuffer">
+                            <aud:Channels />
+                            <aud:LevelDbfs>-30</aud:LevelDbfs>
+                            <aud:Equalise>true</aud:Equalise>
+                            <aud:SyncCopy>false</aud:SyncCopy>
+                          </Combinator>
+                        </Expression>
+                        <Expression xsi:type="WorkflowOutput" />
+                      </Nodes>
+                      <Edges>
+                        <Edge From="0" To="1" Label="Source1" />
+                        <Edge From="1" To="2" Label="Source1" />
+                        <Edge From="3" To="5" Label="Source1" />
+                        <Edge From="4" To="5" Label="Source2" />
+                        <Edge From="2" To="6" Label="Source1" />
+                        <Edge From="5" To="6" Label="Source2" />
+                        <Edge From="6" To="7" Label="Source1" />
+                        <Edge From="7" To="8" Label="Source1" />
+                        <Edge From="8" To="9" Label="Source1" />
+                      </Edges>
+                    </Workflow>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="rx:ToList" />
+                  </Expression>
+                  <Expression xsi:type="rx:AsyncSubject">
+                    <Name>TestSounds</Name>
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>CheckEvents</Name>
+                  </Expression>
+                  <Expression xsi:type="rx:Condition">
+                    <Name>SpeakersAsked?</Name>
+                    <Workflow>
+                      <Nodes>
+                        <Expression xsi:type="WorkflowInput">
+                          <Name>Source1</Name>
+                        </Expression>
+                        <Expression xsi:type="scr:ExpressionTransform">
+                          <scr:Expression>Prompt != null &amp;&amp; Prompt.StartsWith("SpeakerArray:")</scr:Expression>
+                        </Expression>
+                        <Expression xsi:type="WorkflowOutput" />
+                      </Nodes>
+                      <Edges>
+                        <Edge From="0" To="1" Label="Source1" />
+                        <Edge From="1" To="2" Label="Source1" />
+                      </Edges>
+                    </Workflow>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="rx:Take">
+                      <rx:Count>1</rx:Count>
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="rx:SelectMany">
+                    <Name>PlayUntilAnswered</Name>
+                    <Description>Every speaker's test sound, sent together: the mixer plays them one after another (AppendBuffer queues each behind the last); again every 5 s until the person's Confirm for SpeakerArray after Go.</Description>
+                    <Workflow>
+                      <Nodes>
+                        <Expression xsi:type="WorkflowInput">
+                          <Name>Source1</Name>
+                        </Expression>
+                        <Expression xsi:type="Combinator">
+                          <Combinator xsi:type="rx:Timer">
+                            <rx:DueTime>PT0S</rx:DueTime>
+                            <rx:Period>PT5S</rx:Period>
+                          </Combinator>
+                        </Expression>
+                        <Expression xsi:type="SubscribeSubject">
+                          <Name>ControlEvents</Name>
+                        </Expression>
+                        <Expression xsi:type="Combinator">
+                          <Combinator xsi:type="orcl:OnCommand">
+                            <orcl:Name>Confirm</orcl:Name>
+                          </Combinator>
+                        </Expression>
+                        <Expression xsi:type="SubscribeSubject">
+                          <Name>ExperimentGo</Name>
+                        </Expression>
+                        <Expression xsi:type="Combinator">
+                          <Combinator xsi:type="p1:Answered">
+                            <p1:Device>SpeakerArray</p1:Device>
+                          </Combinator>
+                        </Expression>
+                        <Expression xsi:type="Combinator">
+                          <Combinator xsi:type="rx:TakeUntil" />
+                        </Expression>
+                        <Expression xsi:type="SubscribeSubject">
+                          <Name>TestSounds</Name>
+                        </Expression>
+                        <Expression xsi:type="Combinator">
+                          <Combinator xsi:type="rx:WithLatestFrom" />
+                        </Expression>
+                        <Expression xsi:type="MemberSelector">
+                          <Selector>Item2</Selector>
+                        </Expression>
+                        <Expression xsi:type="Combinator">
+                          <Combinator xsi:type="rx:Merge" />
+                        </Expression>
+                        <Expression xsi:type="MulticastSubject">
+                          <Name>StimulusSounds</Name>
+                        </Expression>
+                        <Expression xsi:type="WorkflowOutput" />
+                      </Nodes>
+                      <Edges>
+                        <Edge From="2" To="3" Label="Source1" />
+                        <Edge From="3" To="5" Label="Source1" />
+                        <Edge From="4" To="5" Label="Source2" />
+                        <Edge From="1" To="6" Label="Source1" />
+                        <Edge From="5" To="6" Label="Source2" />
+                        <Edge From="6" To="8" Label="Source1" />
+                        <Edge From="7" To="8" Label="Source2" />
+                        <Edge From="8" To="9" Label="Source1" />
+                        <Edge From="9" To="10" Label="Source1" />
+                        <Edge From="10" To="11" Label="Source1" />
+                        <Edge From="11" To="12" Label="Source1" />
+                      </Edges>
+                    </Workflow>
+                  </Expression>
+                  <Expression xsi:type="WorkflowOutput" />
+                </Nodes>
+                <Edges>
+                  <Edge From="1" To="2" Label="Source1" />
+                  <Edge From="2" To="3" Label="Source1" />
+                  <Edge From="0" To="6" Label="Source1" />
+                  <Edge From="0" To="7" Label="Source1" />
+                  <Edge From="6" To="8" Label="Source1" />
+                  <Edge From="7" To="8" Label="Source2" />
+                  <Edge From="8" To="9" Label="Source1" />
+                  <Edge From="9" To="10" Label="Source1" />
+                  <Edge From="11" To="12" Label="Source1" />
+                  <Edge From="12" To="13" Label="Source1" />
+                  <Edge From="13" To="14" Label="Source1" />
+                  <Edge From="14" To="15" Label="Source1" />
+                  <Edge From="15" To="16" Label="Source1" />
+                  <Edge From="17" To="18" Label="Source1" />
+                  <Edge From="18" To="19" Label="Source1" />
+                  <Edge From="19" To="20" Label="Source1" />
+                  <Edge From="20" To="21" Label="Source1" />
+                </Edges>
+              </Workflow>
+            </Expression>
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+          </Edges>
+        </Workflow>
       </Expression>
       <Expression xsi:type="lv:StreamDevices">
         <Name>LiveView</Name>
