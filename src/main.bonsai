@@ -82,7 +82,7 @@
       </Expression>
       <Expression xsi:type="GroupWorkflow">
         <Name>Devices</Name>
-        <Description>Devices lists every entry the check covers, in rig.yml's order, from &lt;ConfigRoot&gt;\&lt;MACHINE&gt;\rig.yml (OpenRigs.Core ResolveRigConfigDirectory). Each SelectMany opens one branch per entry of its family and keeps the device open until Stop; DeviceMonitor reports what each sent every second, or its error, as DeviceReports.</Description>
+        <Description>Devices lists every entry the check covers, kind by kind, from &lt;ConfigRoot&gt;\&lt;MACHINE&gt;\rig.yml, read into the lab rig model as every lab workflow reads it (OpenRigs.Devices ReadLabRig). Each SelectMany opens one branch per entry of its family and keeps the device open until Stop; DeviceMonitor reports what each sent every second, or its error, as DeviceReports.</Description>
         <Workflow>
           <Nodes>
             <Expression xsi:type="ExternalizedMapping">
@@ -448,10 +448,8 @@
             <Expression xsi:type="rx:PublishSubject">
               <Name>DeviceReports</Name>
             </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="orc:ResolveRigConfigDirectory">
-                <orc:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</orc:ConfigRoot>
-              </Combinator>
+            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
+              <ConfigRoot>C:\Coen-Lab-Local\RigConfigs</ConfigRoot>
             </Expression>
           </Nodes>
           <Edges>

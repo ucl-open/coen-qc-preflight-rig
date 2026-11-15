@@ -1,4 +1,4 @@
-"""The superset schema on real rig.yml files (copied from K:\\config\\machines on 7 Nov 2026), the plan, and the judge."""
+"""The lab rig model on real rig.yml files (copied from K:\\config\\machines on 7 Nov 2026), the plan, and the judge."""
 
 from pathlib import Path
 
@@ -31,10 +31,17 @@ def test_a_box_plans_its_board_and_camera_only():
     assert [d.name for d in plan.plan(rig.load(FIXTURES / "BBOX-1.yml"))] == ["BehaviorBoard-Main", "Camera-Overhead"]
 
 
-def test_unknown_keys_and_absent_sections_are_fine(tmp_path):
+def test_absent_sections_are_fine(tmp_path):
+    f = tmp_path / "rig.yml"
+    f.write_text("rootPath: C:\\x\n", encoding="utf-8")
+    assert plan.plan(rig.load(f)) == []
+
+
+def test_a_key_the_lab_rig_model_lacks_is_refused_as_every_workflow_refuses_it(tmp_path):
     f = tmp_path / "rig.yml"
     f.write_text("rootPath: C:\\x\nsomethingNew: { a: 1 }\n", encoding="utf-8")
-    assert plan.plan(rig.load(f)) == []
+    with pytest.raises(pydantic.ValidationError, match="somethingNew"):
+        rig.load(f)
 
 
 def test_a_wrong_device_entry_is_refused(tmp_path):

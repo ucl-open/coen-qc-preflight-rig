@@ -2,9 +2,11 @@
 
 from dataclasses import dataclass
 
-from coen_qc_preflight_rig.rig import DEVICE_KINDS, SINGLE_SECTIONS, CheckedRig
+from open_rigs.rigs.lab_rig import LabRig
 
-# rig.yml key to CheckedRig attribute.
+from coen_qc_preflight_rig.rig import DEVICE_KINDS, SINGLE_SECTIONS
+
+# rig.yml key to LabRig attribute.
 _FIELDS = {
     "behaviorBoard": "behavior_board",
     "timestampGeneratorGen3": "timestamp_generator_gen3",
@@ -29,7 +31,7 @@ class Planned:
         return pascal(self.kind) + ("-" + pascal(self.instance) if self.instance else "")
 
 
-def plan(rig: CheckedRig) -> list[Planned]:
+def plan(rig: LabRig) -> list[Planned]:
     """Every device and single section the rig declares, in check order."""
     out = [Planned(kind, name, entry) for kind in DEVICE_KINDS for name, entry in getattr(rig, _FIELDS[kind]).items()]
     out += [Planned(kind, "", getattr(rig, _FIELDS[kind])) for kind in SINGLE_SECTIONS if getattr(rig, _FIELDS[kind])]

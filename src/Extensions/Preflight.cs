@@ -15,11 +15,11 @@ using System.Threading;
 using Bonsai;
 using Bonsai.Harp;
 using OpenRigs.Devices;
-using YamlDotNet.RepresentationModel;
+using OpenRigs.Devices.Rigs;
 
-// PROTOTYPE (7 Nov 2026): if the one-workflow design holds on a rig, PreflightDevices belongs beside
-// lib-open-rigs' Shared\RigDevices.cs, whose rule it copies, and the rest in a lab package, both
-// with tests. C# 5: no interpolation, no ?. and no property initialisers. Bonsai measures: nothing
+// PROTOTYPE (7 Nov 2026): if the one-workflow design holds on a rig, the rest belongs in a lab package,
+// with tests. rig.yml is read as every lab workflow reads it, into lib-open-rigs' lab rig model
+// (OpenRigs.Devices ReadLabRig); PreflightDevices only lists its parts. C# 5: no interpolation, no ?. and no property initialisers. Bonsai measures: nothing
 // here judges a device; coen_qc_preflight_rig.judge does.
 
 /// <summary>One entry of rig.yml the check covers: a device (kind: instance: settings) or a single section.</summary>
@@ -142,139 +142,136 @@ static class Preflight
     }
 }
 
-/// <summary>The rig.yml entries of the kinds named, in file order; nothing when the rig declares none of them.</summary>
+/// <summary>The rig.yml entries of the kinds named, in the order of Kinds; nothing when the rig declares none of them.</summary>
 [Combinator]
 [WorkflowElementCategory(ElementCategory.Transform)]
-[Description("The entries of the kinds named in rig.yml in the input folder (OpenRigs.Core ResolveRigConfigDirectory), in file order; nothing when the rig declares none of them.")]
+[Description("The entries of the kinds named in this machine's rig.yml, read into the lab rig model (the input: OpenRigs.Devices ReadLabRig's LabRig), kind by kind in the order of Kinds and each kind's entries in rig.yml's order; nothing when the rig declares none of them.")]
 public class PreflightDevices
 {
     /// <summary>The rig.yml keys to list, separated by commas, such as camera.</summary>
     [Description("The rig.yml keys to list, separated by commas, such as camera.")]
     public string Kinds { get; set; }
 
-    /// <summary>Reads rig.yml in each folder; a missing or unreadable rig.yml is an error: the check cannot run.</summary>
-    public IObservable<PreflightDevice> Process(IObservable<string> source)
+    /// <summary>The entries of each rig.</summary>
+    public IObservable<PreflightDevice> Process(IObservable<LabRig> source)
     {
-        return source.SelectMany(directory => Read(Path.Combine(directory, "rig.yml")));
+        return source.SelectMany(rig => List(rig, Kinds));
     }
 
-    List<PreflightDevice> Read(string path)
+    /// <summary>The rig's entries of the kinds named, as the check takes them.</summary>
+    public static List<PreflightDevice> List(LabRig rig, string kinds)
     {
-        if (!File.Exists(path)) throw new FileNotFoundException("The preflight needs a rig.yml, and there is none at " + path, path);
-        var yaml = new YamlStream();
-        using (var reader = new StreamReader(path)) yaml.Load(reader);
-        var root = yaml.Documents.Count > 0 ? yaml.Documents[0].RootNode as YamlMappingNode : null;
-        if (root == null) throw new InvalidOperationException(path + " is empty or not a set of settings");
-        var kinds = Preflight.Kinds(Kinds);
         var devices = new List<PreflightDevice>();
-        foreach (var kind in root.Children)
+        foreach (var kind in (kinds ?? string.Empty).Split(',').Select(k => k.Trim()).Where(k => k.Length > 0))
         {
-            var kindName = Scalar(kind.Key);
-            var entries = kind.Value as YamlMappingNode;
-            if (kindName == null || entries == null || !kinds.Contains(kindName)) continue;
-            // As lib-open-rigs' RigDevices: a key whose every value is a mapping is a group of devices.
-            if (entries.Children.Count > 0 && entries.Children.Values.All(v => v is YamlMappingNode))
+            switch (kind)
             {
-                foreach (var entry in entries.Children)
-                {
-                    var instance = Scalar(entry.Key) ?? string.Empty;
-                    devices.Add(Device(kindName, instance, Pascal(kindName) + "-" + Pascal(instance), (YamlMappingNode)entry.Value));
-                }
+                case "behaviorBoard": devices.AddRange(Each(kind, rig.BehaviorBoard, Board)); break;
+                case "timestampGeneratorGen3": devices.AddRange(Each(kind, rig.TimestampGeneratorGen3, (d, s) => d.PortName = s.PortName ?? string.Empty)); break;
+                case "stepperDriver": devices.AddRange(Each(kind, rig.StepperDriver, Stepper)); break;
+                case "licketySplit": devices.AddRange(Each(kind, rig.LicketySplit, (d, s) => d.PortName = s.PortName ?? string.Empty)); break;
+                case "camera": devices.AddRange(Each(kind, rig.Camera, Camera)); break;
+                case "speakerArray":
+                    if (rig.SpeakerArray != null) devices.Add(Single(kind));
+                    break;
+                case "projectionCalibration":
+                    if (rig.ProjectionCalibration != null)
+                    {
+                        var projection = Single(kind);
+                        projection.MeshMapPath = rig.ProjectionCalibration.MeshMapPath ?? string.Empty;
+                        projection.GammaLutPath = rig.ProjectionCalibration.GammaLutPath ?? string.Empty;
+                        devices.Add(projection);
+                    }
+                    break;
+                default: throw new InvalidOperationException("PreflightDevices' Kinds names '" + kind + "', which is not a part of the lab rig model the check covers.");
             }
-            else devices.Add(Device(kindName, string.Empty, Pascal(kindName), entries));
         }
         return devices;
     }
 
-    static PreflightDevice Device(string kind, string instance, string name, YamlMappingNode settings)
+    static IEnumerable<PreflightDevice> Each<T>(string kind, Dictionary<string, T> entries, Action<PreflightDevice, T> fill)
+    {
+        if (entries == null) yield break;
+        foreach (var entry in entries)
+        {
+            var device = Blank(kind, entry.Key, Pascal(kind) + "-" + Pascal(entry.Key));
+            fill(device, entry.Value);
+            yield return device;
+        }
+    }
+
+    static PreflightDevice Single(string kind)
+    {
+        return Blank(kind, string.Empty, Pascal(kind));
+    }
+
+    static PreflightDevice Blank(string kind, string instance, string name)
     {
         var device = new PreflightDevice();
         device.Kind = kind;
         device.Instance = instance;
         device.Name = name;
-        device.PortName = Setting(settings, "portName");
-        device.SerialNumber = Setting(settings, "serialNumber");
-        device.MeshMapPath = Setting(settings, "meshMapPath");
-        device.GammaLutPath = Setting(settings, "gammaLutPath");
-        var widths = new List<string>();
-        var outputs = Child(Child(settings, "pulseController"), "outputs");
-        if (outputs != null)
-        {
-            foreach (var line in outputs.Children)
-            {
-                var width = Setting(line.Value as YamlMappingNode, "pulseWidthMs");
-                if (width.Length > 0) widths.Add(Scalar(line.Key) + "=" + width);
-            }
-        }
-        device.PulseWidths = string.Join(",", widths);
-        device.OutputPulseEnable = Setting(Child(settings, "pulseController"), "outputPulseEnable");
-        var trigger = Child(settings, "cameraTriggerController");
-        if (Setting(trigger, "trigger0Enabled").ToLowerInvariant() == "true")
-            device.Trigger0Frequency = (int)Number(trigger, "trigger0Frequency", 50);
-        device.RunningWheel = Child(settings, "runningWheel") != null;
-        device.ExposureTime = Number(settings, "exposureTime", 19000);
-        device.Gain = Number(settings, "gain", 0);
-        device.Binning = (int)Number(settings, "binning", 1);
-        device.PixelFormat = Setting(settings, "pixelFormat");
-        if (device.PixelFormat.Length == 0) device.PixelFormat = "Mono8";
-        device.StepInterval = (int)Number(settings, "stepInterval", 0);
-        device.MicrostepResolution = Setting(settings, "microstepResolution");
-        device.MaximumRunCurrent = Number(settings, "maximumRunCurrent", 0);
-        var wiring = Child(settings, "wiring");
-        if (wiring != null)
-        {
-            // The lab's HarpStepperDriver wiring: Motor0-3 and Input0-3, each naming what it drives or reads.
-            foreach (var line in wiring.Children)
-            {
-                var key = (Scalar(line.Key) ?? string.Empty).ToLowerInvariant();
-                int n;
-                if (!(line.Value is YamlMappingNode) || key.Length < 6 || !int.TryParse(key.Substring(key.Length - 1), out n) || n > 3) continue;
-                if (key.StartsWith("motor")) device.WiredMotors |= 1 << n;
-                else if (key.StartsWith("input")) device.WiredInputs |= 1 << n;
-            }
-        }
+        device.PortName = string.Empty;
+        device.SerialNumber = string.Empty;
+        device.MeshMapPath = string.Empty;
+        device.GammaLutPath = string.Empty;
+        device.PulseWidths = string.Empty;
+        device.OutputPulseEnable = string.Empty;
+        device.PixelFormat = string.Empty;
+        device.MicrostepResolution = string.Empty;
         return device;
     }
 
-    static double Number(YamlMappingNode settings, string key, double otherwise)
+    static void Board(PreflightDevice device, BehaviorBoard board)
     {
-        var text = Setting(settings, key);
-        if (text.Length == 0) return otherwise;
-        double value;
-        if (!double.TryParse(text, NumberStyles.Float, Preflight.Invariant, out value))
-            throw new InvalidOperationException("rig.yml's " + key + " is '" + text + "', not a number");
-        return value;
-    }
-
-    static YamlMappingNode Child(YamlMappingNode settings, string key)
-    {
-        if (settings == null) return null;
-        foreach (var pair in settings.Children)
+        device.PortName = board.PortName ?? string.Empty;
+        var pulses = board.PulseController;
+        if (pulses != null)
         {
-            if (Scalar(pair.Key) == key) return pair.Value as YamlMappingNode;
-        }
-        return null;
-    }
-
-    static string Setting(YamlMappingNode settings, string key)
-    {
-        if (settings == null) return string.Empty;
-        foreach (var pair in settings.Children)
-        {
-            if (Scalar(pair.Key) == key)
+            var widths = new List<string>();
+            var outputs = pulses.Outputs;
+            if (outputs != null)
             {
-                // An unset value is null, ~ or empty, as lib-open-rigs' RigDevices.Value reads it.
-                var value = Scalar(pair.Value);
-                return string.IsNullOrWhiteSpace(value) || value == "null" || value == "~" ? string.Empty : value.Trim();
+                var lines = new[] { Tuple.Create("DO1", outputs.DO1), Tuple.Create("DO2", outputs.DO2), Tuple.Create("DO3", outputs.DO3) };
+                foreach (var line in lines)
+                {
+                    var fixedPulse = line.Item2 as FixedPulse;
+                    if (fixedPulse != null) widths.Add(line.Item1 + "=" + fixedPulse.PulseWidthMs.ToString(Preflight.Invariant));
+                }
             }
+            device.PulseWidths = string.Join(",", widths);
+            device.OutputPulseEnable = pulses.OutputPulseEnable == 0 ? string.Empty : pulses.OutputPulseEnable.ToString();
         }
-        return string.Empty;
+        var trigger = board.CameraTriggerController;
+        if (trigger != null && trigger.Trigger0Enabled) device.Trigger0Frequency = trigger.Trigger0Frequency;
+        device.RunningWheel = board.RunningWheel != null;
     }
 
-    static string Scalar(YamlNode node)
+    static void Stepper(PreflightDevice device, HarpStepperDriver driver)
     {
-        var scalar = node as YamlScalarNode;
-        return scalar != null ? scalar.Value : null;
+        device.PortName = driver.PortName ?? string.Empty;
+        device.StepInterval = driver.StepInterval;
+        device.MicrostepResolution = driver.MicrostepResolution.ToString();
+        device.MaximumRunCurrent = driver.MaximumRunCurrent;
+        var wiring = driver.Wiring;
+        if (wiring == null) return;
+        // The lab's HarpStepperDriver wiring: Motor0-3 and Input0-3, each naming what it drives or reads.
+        var motors = new[] { wiring.Motor0, wiring.Motor1, wiring.Motor2, wiring.Motor3 };
+        var inputs = new[] { wiring.Input0, wiring.Input1, wiring.Input2, wiring.Input3 };
+        for (var n = 0; n < 4; n++)
+        {
+            if (motors[n] != null) device.WiredMotors |= 1 << n;
+            if (inputs[n] != null) device.WiredInputs |= 1 << n;
+        }
+    }
+
+    static void Camera(PreflightDevice device, SpinnakerCamera camera)
+    {
+        device.SerialNumber = camera.SerialNumber ?? string.Empty;
+        device.ExposureTime = camera.ExposureTime;
+        device.Gain = camera.Gain;
+        device.Binning = camera.Binning;
+        device.PixelFormat = string.IsNullOrEmpty(camera.PixelFormat) ? "Mono8" : camera.PixelFormat;
     }
 
     static string Pascal(string name)

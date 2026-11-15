@@ -17,7 +17,8 @@ from pathlib import Path
 import yaml
 
 from coen_qc_preflight_rig.plan import Planned, plan
-from coen_qc_preflight_rig.rig import CheckedRig
+from coen_qc_preflight_rig.rig import load
+from open_rigs.rigs.lab_rig import LabRig
 
 
 def read_raw(path: Path) -> dict[str, dict[str, tuple[str, str]]]:
@@ -36,7 +37,7 @@ def _number(measures: dict, key: str) -> float | None:
         return None
 
 
-def _trigger_hz(rig: CheckedRig) -> float | None:
+def _trigger_hz(rig: LabRig) -> float | None:
     """The first behavior board's trigger0Frequency: the frame rate a triggered camera should run at."""
     for board in rig.behavior_board.values():
         trigger = getattr(board, "camera_trigger_controller", None)
@@ -45,7 +46,7 @@ def _trigger_hz(rig: CheckedRig) -> float | None:
     return None
 
 
-def device_verdict(device: Planned, measures: dict | None, limits: dict, rig: CheckedRig) -> str:
+def device_verdict(device: Planned, measures: dict | None, limits: dict, rig: LabRig) -> str:
     """"" when the device passed, else why not, as a sentence fragment."""
     if not measures:
         return "did not report"
@@ -87,7 +88,7 @@ def check_commit(clone: Path) -> str:
 def judge(rig_yml: Path, raw: Path, thresholds: Path, rig_name: str, commit: str) -> dict:
     """The pass record: what the rig-control gate reads. Dated by the raw file, when it was measured, so a
     file left from an earlier run is never a fresh pass (audit, 7 Nov 2026)."""
-    rig = CheckedRig.model_validate(yaml.safe_load(Path(rig_yml).read_text(encoding="utf-8-sig")) or {})
+    rig = load(rig_yml)
     limits = yaml.safe_load(Path(thresholds).read_text(encoding="utf-8")) or {}
     rows = read_raw(raw)
     planned = plan(rig)
