@@ -42,7 +42,8 @@ jobs:
         if: hashFiles('src/Extensions.csproj') != ''
         shell: pwsh
         run: |
-          dotnet build src/Extensions.csproj -p:LangVersion=5 -o "$env:RUNNER_TEMP/extensions"
+          # The lab's packages come from local_packages, as Setup.ps1 restores them (.bonsai\NuGet.config).
+          dotnet build src/Extensions.csproj -p:LangVersion=5 -o "$env:RUNNER_TEMP/extensions" --source https://api.nuget.org/v3/index.json --source "$PWD/local_packages"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: main.bonsai parses
         shell: pwsh
