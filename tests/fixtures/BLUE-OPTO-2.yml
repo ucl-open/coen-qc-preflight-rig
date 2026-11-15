@@ -98,7 +98,7 @@ speakerArray:
     bootDelay: 3.0          # s; guards a driver fault if the workflow stops during mixer init
   syncChannel: 31           # carries a copy of each stimulus for alignment with acquisition
   syncGain: 0.2
-  errorSoundChannel: 2      # the error sound's channel
+  penaltySoundChannel: 2    # the penalty sound's channel
   unusedChannels: [30]      # not connected
   # Position is relative to the subject: azimuth 0 = straight ahead, positive to the right.
   # filter: each speaker's SpeakerFilter artefact; the dome model refuses a speaker without one.
