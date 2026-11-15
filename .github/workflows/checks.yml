@@ -1,0 +1,51 @@
+# The checks run before a push (README), on every push to main, as far as CI can run them: the Python tests, Bonsai
+# set up as a rig sets it up (.bonsai\Setup.ps1: Bonsai and every package restored), src\Extensions compiled under
+# C# 5 (the language Bonsai compiles it with) and src\main.bonsai parsed. The full build check (main.bonsai built with
+# Bonsai's builders, its ExperimentControl names, its layout) is app-rig-setup's workflows\check-workflow-builds.ps1,
+# in a private repository: run it before pushing.
+
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    # Windows, as on the rigs: Bonsai and the C# 5 compile need it.
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x
+      - name: Python tests
+        if: hashFiles('pyproject.toml') != ''
+        shell: pwsh
+        run: |
+          uv sync --locked
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          uv run --locked --with pytest --with pyyaml pytest -q
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Bonsai setup
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File .bonsai/Setup.ps1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Extensions under C# 5
+        if: hashFiles('src/Extensions.csproj') != ''
+        shell: pwsh
+        run: |
+          dotnet build src/Extensions.csproj -p:LangVersion=5 -o "$env:RUNNER_TEMP/extensions"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: main.bonsai parses
+        shell: pwsh
+        run: |
+          uv run --no-project python -c "import xml.etree.ElementTree as ET; ET.parse('src/main.bonsai'); print('src/main.bonsai parses')"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
