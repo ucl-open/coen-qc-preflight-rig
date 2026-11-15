@@ -9,7 +9,7 @@
     <PackageReference Include="Bonsai.Core" Version="2.9.0" />
     <PackageReference Include="Bonsai.Harp" Version="3.6.1" />
     <PackageReference Include="Bonsai.Spinnaker" Version="0.9.1" />
-    <PackageReference Include="OpenRigs.Devices" Version="0.1.1-coen-lab.16" />
+    <PackageReference Include="OpenRigs.Devices" Version="0.1.1-coen-lab.17" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
   </ItemGroup>
 
