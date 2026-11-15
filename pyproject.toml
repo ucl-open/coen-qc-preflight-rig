@@ -21,7 +21,7 @@ coen-qc-preflight-rig = "coen_qc_preflight_rig.cli:main"
 dev = ["pytest"]
 
 [tool.uv.sources]
-open-rigs = {git = "https://github.com/Coen-Lab/lib-open-rigs", rev = "46efcc3892b36edcc321f39c05b9f488fbf5b239"}
+open-rigs = {git = "https://github.com/Coen-Lab/lib-open-rigs", rev = "38aed51a602e0a8cfb57b5139d054769e7cc5e4a"}
 swc-aeon = { git = "https://github.com/SainsburyWellcomeCentre/aeon_api.git", branch = "main" }
 
 [tool.ruff]
