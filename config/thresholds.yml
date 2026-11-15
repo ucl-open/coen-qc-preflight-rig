@@ -5,5 +5,5 @@ timestampGeneratorGen3: { minMessages: 1 }
 stepperDriver: { minMessages: 1 }
 licketySplit: { minMessages: 1 }
 camera: { minRateFraction: 0.98 }           # frames per second over the triggering board's trigger0Frequency
-speakerArray: { personConfirms: true }      # asked at the end: each speaker played the test sound (SpeakerMixer, lib default level)
+speakerArray: { minSounds: 1, personConfirms: true }  # test sounds the mixer was sent for each rig.yml speaker, judged first; then asked at the end: each speaker played it (SpeakerMixer, lib default level)
 projectionCalibration: { minFrameRate: 55, personConfirms: true }  # frames drawn per second at 60 Hz VSync; then asked at the end: the test pattern fills the screen

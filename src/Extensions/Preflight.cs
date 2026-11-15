@@ -65,6 +65,23 @@ public class PreflightDevice
     public string MicrostepResolution { get; set; }
     /// <summary>A stepper driver's maximumRunCurrent in A; 0 when rig.yml gives none.</summary>
     public double MaximumRunCurrent { get; set; }
+    /// <summary>A speakerArray's speakers in rig.yml's order with their mixer channels, such as left=0,right=1,centre=2; empty elsewhere.</summary>
+    public string Speakers { get; set; }
+}
+
+/// <summary>How many test sounds the mixer has been sent for each rig.yml speaker (CountSpeakerSounds), in rig.yml's order.</summary>
+public class SpeakerSounds
+{
+    /// <summary>Each speaker's rig.yml name, such as left.</summary>
+    public string[] Names { get; set; }
+    /// <summary>The test sounds sent to the mixer on each speaker's channel, by Names.</summary>
+    public int[] Counts { get; set; }
+
+    /// <summary>The fewest sent to any one speaker: every speaker has been sent at least this many; 0 with no speakers.</summary>
+    public int Fewest
+    {
+        get { return Counts == null || Counts.Length == 0 ? 0 : Counts.Min(); }
+    }
 }
 
 /// <summary>One raw measurement, a row of the check's CSV: device,measure,value,detail (camelCase, the lab's column names).</summary>
@@ -172,7 +189,13 @@ public class PreflightDevices
                 case "licketySplit": devices.AddRange(Each(kind, rig.LicketySplit, (d, s) => d.PortName = s.PortName ?? string.Empty)); break;
                 case "camera": devices.AddRange(Each(kind, rig.Camera, Camera)); break;
                 case "speakerArray":
-                    if (rig.SpeakerArray != null) devices.Add(Single(kind));
+                    if (rig.SpeakerArray != null)
+                    {
+                        var array = Single(kind);
+                        if (rig.SpeakerArray.Speakers != null)
+                            array.Speakers = string.Join(",", rig.SpeakerArray.Speakers.Select(s => s.Key + "=" + (s.Value == null ? -1 : s.Value.Channel).ToString(Preflight.Invariant)));
+                        devices.Add(array);
+                    }
                     break;
                 case "projectionCalibration":
                     if (rig.ProjectionCalibration != null)
@@ -219,6 +242,7 @@ public class PreflightDevices
         device.OutputPulseEnable = string.Empty;
         device.PixelFormat = string.Empty;
         device.MicrostepResolution = string.Empty;
+        device.Speakers = string.Empty;
         return device;
     }
 
@@ -357,25 +381,28 @@ public class DeviceMonitor
 /// <summary>
 /// The devices metric, once a second once every device has opened or failed: each device in list
 /// order as Device measure rate (per second over the last second) or Device error detail, joined by ;.
+/// A speaker array, which has nothing to open, is SpeakerArray sounds n: every rig.yml speaker has been
+/// sent at least n test sounds through the mixer (CountSpeakerSounds).
 /// </summary>
 [Combinator]
 [WorkflowElementCategory(ElementCategory.Combinator)]
-[Description("Each device's rate over the last second, or its error, once a second once every device has opened or failed.")]
+[Description("Each device's rate over the last second, or its error, once a second once every device has opened or failed; a speaker array as the test sounds each speaker has been sent.")]
 public class DeviceRates
 {
     string notOpened = "speakerArray";
 
-    /// <summary>Kinds with nothing to open, only a person's answer: listed as Device person 0.</summary>
+    /// <summary>Kinds with nothing to open: a speaker array is listed as SpeakerArray sounds n, any other as Device person 0.</summary>
     public string NotOpened { get { return notOpened; } set { notOpened = value; } }
 
     /// <summary>The devices metric's text.</summary>
-    public IObservable<string> Process(IObservable<PreflightDevice[]> devices, IObservable<DeviceReport> reports)
+    public IObservable<string> Process(IObservable<PreflightDevice[]> devices, IObservable<DeviceReport> reports, IObservable<SpeakerSounds> sounds)
     {
         var skip = Preflight.Kinds(NotOpened);
         return Observable.Create<string>(observer =>
         {
             var gate = new object();
             PreflightDevice[] list = null;
+            SpeakerSounds sent = null;
             var latest = new Dictionary<string, DeviceReport>();
             var settled = new HashSet<string>();
             var listed = devices.Take(1).Subscribe(l => { lock (gate) list = l; }, observer.OnError);
@@ -387,23 +414,29 @@ public class DeviceRates
                     if (r.Settled) settled.Add(r.Device);
                 }
             }, observer.OnError);
+            var played = sounds.Subscribe(s => { lock (gate) sent = s; }, observer.OnError);
             var ticks = Observable.Interval(TimeSpan.FromSeconds(1)).Subscribe(_ =>
             {
                 string text;
                 lock (gate)
                 {
                     if (list == null || !list.All(d => skip.Contains(d.Kind) || settled.Contains(d.Name))) return;
-                    text = string.Join(";", list.Select(d => Entry(d, skip.Contains(d.Kind) ? null : latest[d.Name])));
+                    text = string.Join(";", list.Select(d => skip.Contains(d.Kind) ? Unopened(d, sent) : Entry(d, latest[d.Name])));
                 }
                 observer.OnNext(text);
             });
-            return new CompositeDisposable(listed, heard, ticks);
+            return new CompositeDisposable(listed, heard, played, ticks);
         });
+    }
+
+    static string Unopened(PreflightDevice device, SpeakerSounds sent)
+    {
+        if (device.Kind != "speakerArray") return device.Name + " person 0";
+        return device.Name + " sounds " + (sent == null ? 0 : sent.Fewest).ToString(Preflight.Invariant);
     }
 
     static string Entry(PreflightDevice device, DeviceReport report)
     {
-        if (report == null) return device.Name + " person 0";
         if (report.Error != null) return device.Name + " error " + report.Error;
         var rate = report.Seconds > 0 ? report.Count / report.Seconds : 0;
         return device.Name + " " + report.Measure + " " + rate.ToString("0.#", Preflight.Invariant);
@@ -435,8 +468,9 @@ public class RunCheck
 
     static readonly object Went = new object();
 
-    /// <summary>The check's states.</summary>
-    public IObservable<CheckState> Process<TGo>(IObservable<PreflightDevice[]> devices, IObservable<DeviceReport> reports, IObservable<TGo> go, IObservable<string> confirms)
+    /// <summary>The check's states. A speaker array's rows are, before its person row, one per rig.yml speaker:
+    /// SpeakerArray,sounds:&lt;speaker&gt;,n, the test sounds sent to the mixer on that speaker's channel by the answer.</summary>
+    public IObservable<CheckState> Process<TGo>(IObservable<PreflightDevice[]> devices, IObservable<DeviceReport> reports, IObservable<TGo> go, IObservable<string> confirms, IObservable<SpeakerSounds> sounds)
     {
         var skip = Preflight.Kinds(NotOpened);
         var asked = new Dictionary<string, string>();
@@ -455,7 +489,8 @@ public class RunCheck
                 devices.Take(1).Subscribe(l => inbox.Add(l), fail),
                 reports.Subscribe(r => inbox.Add(r), fail),
                 go.Take(1).Subscribe(_ => inbox.Add(Went), fail),
-                confirms.Subscribe(c => inbox.Add(c ?? string.Empty), fail));
+                confirms.Subscribe(c => inbox.Add(c ?? string.Empty), fail),
+                sounds.Subscribe(s => inbox.Add(s), fail));
             var thread = new Thread(() =>
             {
                 try { new Run(inbox, cancel.Token, observer, skip, asked, window).Check(); }
@@ -479,6 +514,7 @@ public class RunCheck
         readonly Dictionary<string, string> errors = new Dictionary<string, string>();
         readonly Dictionary<string, bool> answers = new Dictionary<string, bool>();
         PreflightDevice[] list;
+        SpeakerSounds sent;
         bool went;
 
         public Run(BlockingCollection<object> inbox, CancellationToken token, IObserver<CheckState> observer,
@@ -509,6 +545,13 @@ public class RunCheck
                 {
                     Send(null, string.Empty, device.Name + ": " + asked[device.Kind], false);
                     Next(Timeout.InfiniteTimeSpan);
+                }
+                // The evidence before the person's word (Pip, 15 Nov 2026): the test sounds the mixer was sent
+                // for each speaker, by the answer; the judge fails a speaker that was sent none, whatever the answer.
+                if (device.Kind == "speakerArray" && sent != null)
+                {
+                    for (var i = 0; i < sent.Names.Length; i++)
+                        Send(Row(device.Name, "sounds:" + sent.Names[i], sent.Counts[i].ToString(Preflight.Invariant), string.Empty), null, null, false);
                 }
                 Send(Row(device.Name, "person", answers[device.Name] ? "1" : "0", string.Empty), string.Empty, string.Empty, false);
             }
@@ -554,6 +597,7 @@ public class RunCheck
             var error = item as Exception;
             if (error != null) { observer.OnError(error); throw new OperationCanceledException(); }
             if (item is PreflightDevice[]) list = (PreflightDevice[])item;
+            else if (item is SpeakerSounds) sent = (SpeakerSounds)item;
             else if (item == Went) went = true;
             var report = item as DeviceReport;
             if (report != null && report.Error != null) errors[report.Device] = report.Error;
@@ -621,6 +665,149 @@ public class Answered
 }
 
 /// <summary>
+/// The evidence that the speakers were played to (Pip, 15 Nov 2026: evidence plus person): each sound
+/// the mixer is sent (SpeakerMixer's MixerStimulusSounds, past its CheckMixerStarted, on its way to
+/// AppendBuffer) counted for every rig.yml speaker whose channel carries sound in it, one line on
+/// stderr each. Gives the counts at once with every speaker at 0, then after each sound.
+/// </summary>
+[Combinator]
+[WorkflowElementCategory(ElementCategory.Combinator)]
+[Description("Counts the sounds sent to the mixer for each rig.yml speaker, by the channels that carry sound; one stderr line each. Input: the mixer's sounds, the speakerArray entry.")]
+public class CountSpeakerSounds
+{
+    /// <summary>The counts, at once with every speaker at 0, then after each sound with sound on a speaker's channel.</summary>
+    public IObservable<SpeakerSounds> Process(IObservable<OpenCV.Net.Mat> sounds, IObservable<PreflightDevice> speakerArray)
+    {
+        return Observable.Create<SpeakerSounds>(observer =>
+        {
+            var gate = new object();
+            string[] names = null;
+            int[] channels = null, counts = null;
+            var listed = speakerArray.Take(1).Subscribe(array =>
+            {
+                var speakers = Parse(array.Speakers);
+                SpeakerSounds first;
+                lock (gate)
+                {
+                    names = speakers.Select(s => s.Key).ToArray();
+                    channels = speakers.Select(s => s.Value).ToArray();
+                    counts = new int[names.Length];
+                    first = Snapshot(names, counts);
+                }
+                observer.OnNext(first);
+            }, observer.OnError);
+            var heard = sounds.Subscribe(sound =>
+            {
+                SpeakerSounds now;
+                lock (gate)
+                {
+                    if (names == null || sound == null) return;
+                    var any = false;
+                    for (var i = 0; i < names.Length; i++)
+                    {
+                        if (channels[i] < 0 || channels[i] >= sound.Rows) continue;
+                        using (var row = sound.GetRow(channels[i]))
+                        {
+                            if (OpenCV.Net.CV.CountNonZero(row) == 0) continue;
+                        }
+                        counts[i]++;
+                        any = true;
+                        Console.Error.WriteLine("preflight: SpeakerArray " + names[i] + " test sound " + counts[i].ToString(Preflight.Invariant) + " sent to the mixer");
+                    }
+                    if (!any) return;
+                    now = Snapshot(names, counts);
+                }
+                observer.OnNext(now);
+            }, observer.OnError);
+            return new CompositeDisposable(listed, heard);
+        });
+    }
+
+    // left=0,right=1,centre=2, as PreflightDevices gives a speakerArray's Speakers.
+    static List<KeyValuePair<string, int>> Parse(string speakers)
+    {
+        var list = new List<KeyValuePair<string, int>>();
+        foreach (var pair in (speakers ?? string.Empty).Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var cut = pair.LastIndexOf('=');
+            int channel;
+            if (cut > 0 && int.TryParse(pair.Substring(cut + 1), NumberStyles.Integer, Preflight.Invariant, out channel))
+                list.Add(new KeyValuePair<string, int>(pair.Substring(0, cut).Trim(), channel));
+        }
+        return list;
+    }
+
+    static SpeakerSounds Snapshot(string[] names, int[] counts)
+    {
+        return new SpeakerSounds { Names = (string[])names.Clone(), Counts = (int[])counts.Clone() };
+    }
+}
+
+/// <summary>
+/// Ends headless Bonsai when it is still running GraceSeconds after the controller's stop, or after the
+/// workflow began to end for any other reason. Headless Bonsai returns from Main as soon as its runner
+/// has the stop's error, and the process then lasts while any foreground thread does: here the live
+/// view's two publishers (ObserveOn NewThreadScheduler, in OpenRigs.LiveView's StreamController), which
+/// end only once their subscriptions are disposed, last of all. A disposal held up anywhere before them
+/// kept Bonsai running until the agent killed it 30 s after End Testing's stop (GREEN-DOME-2, 15 Nov 2026).
+/// In the editor, which outlives its workflows, it does nothing.
+/// </summary>
+[Combinator]
+[WorkflowElementCategory(ElementCategory.Source)]
+[Description("Ends headless Bonsai if it is still running GraceSeconds after the controller's stop (or after the workflow began to end); nothing in the editor.")]
+public class EndAfterStop
+{
+    double graceSeconds = 2;
+
+    /// <summary>Seconds the workflow's own teardown is given after the stop; 0 or less leaves it to the agent's kill.</summary>
+    [Description("Seconds the workflow's own teardown is given after the stop; 0 or less leaves it to the agent's kill.")]
+    public double GraceSeconds { get { return graceSeconds; } set { graceSeconds = value; } }
+
+    /// <summary>Never gives anything; watches for the stop from a background thread.</summary>
+    public IObservable<string> Process()
+    {
+        return Observable.Create<string>(observer =>
+        {
+            var grace = GraceSeconds;
+            if (grace <= 0 || !Environment.GetCommandLineArgs().Contains("--no-editor")) return Disposable.Empty;
+            var ending = new ManualResetEventSlim(false);
+            var watch = new Thread(() => Watch(ending, TimeSpan.FromSeconds(grace)));
+            watch.IsBackground = true;
+            watch.Name = "Preflight EndAfterStop";
+            watch.Start();
+            // Disposed means the workflow is ending: the watch goes on, since a teardown held up is what it is for.
+            return Disposable.Create(ending.Set);
+        });
+    }
+
+    static void Watch(ManualResetEventSlim ending, TimeSpan grace)
+    {
+        string why = null;
+        OpenRigs.Control.ControlState control = null;
+        while (why == null)
+        {
+            var ended = ending.Wait(100);
+            // Kept once seen: the control server forgets its state as it is disposed.
+            control = OpenRigs.Control.ControlState.Current ?? control;
+            var stop = control == null ? null : control.StopReason;
+            if (stop != null) why = "the stop (" + stop + ")";
+            else if (ended) why = "the workflow began to end";
+        }
+        Thread.Sleep(grace);
+        Console.Error.WriteLine("preflight: Bonsai was still running " + grace.TotalSeconds.ToString(Preflight.Invariant) + " s after " + why +
+                                ", its teardown held up, so EndAfterStop ends it");
+        var kill = new Thread(() =>
+        {
+            Thread.Sleep(3000);
+            System.Diagnostics.Process.GetCurrentProcess().Kill();
+        });
+        kill.IsBackground = true;
+        kill.Start();
+        Environment.Exit(0);
+    }
+}
+
+/// <summary>
 /// Passes the source through until the signal, then completes at the source's next item, on the
 /// source's own thread: a BonVision render chain ended from another thread is disposed off the GL
 /// thread, and RenderTexture deleting its framebuffer there crashed the process (7 Nov 2026).
@@ -636,7 +823,10 @@ public class CloseWhen
         return Observable.Create<TSource>(observer =>
         {
             var closing = 0;
-            var signalled = signal.Take(1).Subscribe(_ => Volatile.Write(ref closing, 1));
+            // An error on the signal (a stop: ExperimentStoppedException through ControlEvents) closes as the
+            // signal does, at the source's next item on its own thread. With no handler Rx threw it on the
+            // control server's thread, which nothing catches there.
+            var signalled = signal.Take(1).Subscribe(_ => Volatile.Write(ref closing, 1), e => Volatile.Write(ref closing, 1));
             var passed = source.TakeWhile(_ => Volatile.Read(ref closing) == 0).Subscribe(observer);
             return new CompositeDisposable(signalled, passed);
         });

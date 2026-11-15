@@ -2,7 +2,8 @@
 
 The workflow writes one row per measurement, `device,measure,value,detail`: a device that failed to open
 writes `error` with the message; a Harp board `messages` and `seconds`; a camera `frames` and `seconds`;
-a section a person confirms `person` (1 yes, 0 no). Every device rig.yml declares must report, and
+a section a person confirms `person` (1 yes, 0 no); a speaker array also `sounds:<speaker>` for each rig.yml
+speaker, the test sounds the mixer was sent on its channel. Every device rig.yml declares must report, and
 nothing else may: a missing or extra device fails the check, so a workflow that starts the wrong
 branches never passes.
 """
@@ -37,6 +38,11 @@ def _number(measures: dict, key: str) -> float | None:
         return None
 
 
+def _speakers(device: Planned) -> list[str]:
+    """A speaker array's speakers, by their rig.yml names; none for any other device."""
+    return list(getattr(device.settings, "speakers", None) or {})
+
+
 def _trigger_hz(rig: LabRig) -> float | None:
     """The first behavior board's trigger0Frequency: the frame rate a triggered camera should run at."""
     for board in rig.behavior_board.values():
@@ -57,6 +63,11 @@ def device_verdict(device: Planned, measures: dict | None, limits: dict, rig: La
         rate = frames / seconds if frames and seconds else 0.0
         if rate < limits["minFrameRate"]:
             return f"{rate:.1f} frames/s drawn, {limits['minFrameRate']} needed"
+    if "minSounds" in limits:  # the test sounds the mixer was sent: judged before any person's word (Pip, 15 Nov 2026)
+        short = [f"{name} {_number(measures, f'sounds:{name}') or 0:g}" for name in _speakers(device)
+                 if (_number(measures, f"sounds:{name}") or 0) < limits["minSounds"]]
+        if short:
+            return f"test sounds sent to the mixer: {', '.join(short)}, {limits['minSounds']} each needed"
     if "personConfirms" in limits:
         return "" if _number(measures, "person") == 1 else "not confirmed by the person"
     if "minFrameRate" in limits:
