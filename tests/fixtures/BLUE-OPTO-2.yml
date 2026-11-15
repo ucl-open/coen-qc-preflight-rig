@@ -95,7 +95,7 @@ speakerArray:
     sampleRate: 48000       # Hz
     channelCount: 32
     suggestedLatency: 0.002 # s
-    bootDelay: 3.0          # s; guards a driver fault if the workflow stops during mixer init
+    bootDelaySeconds: 3.0   # s; guards a driver fault if the workflow stops during mixer init
   syncChannel: 31           # carries a copy of each stimulus for alignment with acquisition
   syncGain: 0.2
   penaltySoundChannel: 2    # the penalty sound's channel
