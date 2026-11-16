@@ -5,14 +5,12 @@ using System.Globalization;
 using System.Linq;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
-using System.Threading;
 using Bonsai;
 using OpenRigs.Devices;
 using OpenRigs.Devices.Rigs;
 
 // What only the preflight does, beside the lab's pieces (the rig list) and its check (OpenRigs.Devices PreflightChecks):
-// never a device opened here (Pip, 16 Nov 2026): the speakers' test sounds counted; headless Bonsai ended after a
-// stop. C# 5: no interpolation, no ?. and no property initialisers. Bonsai measures: nothing here judges a device; coen_qc_preflight_rig.judge does.
+// never a device opened here (Pip, 16 Nov 2026): the speakers' test sounds counted. C# 5: no interpolation, no ?. and no property initialisers. Bonsai measures: nothing here judges a device; coen_qc_preflight_rig.judge does.
 
 static class Preflight
 {
@@ -81,72 +79,5 @@ public class CountSpeakerSounds
     static SpeakerSounds Snapshot(string[] names, int[] counts)
     {
         return new SpeakerSounds { Names = (string[])names.Clone(), Counts = (int[])counts.Clone() };
-    }
-}
-
-/// <summary>
-/// Ends headless Bonsai when it is still running GraceSeconds after the controller's stop, or after the workflow began
-/// to end for any other reason. Headless Bonsai returns from Main as soon as its runner has the stop's error, and the
-/// process then lasts while any foreground thread does: here the live view's two publishers, which end only once
-/// their subscriptions are disposed, last of all. A disposal held up anywhere before them kept Bonsai running until
-/// the agent killed it 30 s after End Testing's stop (GREEN-DOME-2, 15 Nov 2026). Exit code 0 after the controller's
-/// stop, 1 after any other end (an error). In the editor it does nothing.
-/// </summary>
-[Combinator]
-[WorkflowElementCategory(ElementCategory.Source)]
-[Description("Ends headless Bonsai if it is still running GraceSeconds after the controller's stop (exit code 0) or after the workflow began to end for any other reason, an error (exit code 1); nothing in the editor.")]
-public class EndAfterStop
-{
-    double graceSeconds = 2;
-
-    /// <summary>Seconds the workflow's own teardown is given after the stop; 0 or less leaves it to the agent's kill.</summary>
-    [Description("Seconds the workflow's own teardown is given after the stop; 0 or less leaves it to the agent's kill.")]
-    public double GraceSeconds { get { return graceSeconds; } set { graceSeconds = value; } }
-
-    /// <summary>Never gives anything; watches for the stop from a background thread.</summary>
-    public IObservable<string> Process()
-    {
-        return Observable.Create<string>(observer =>
-        {
-            var grace = GraceSeconds;
-            if (grace <= 0 || !Environment.GetCommandLineArgs().Contains("--no-editor")) return Disposable.Empty;
-            var ending = new ManualResetEventSlim(false);
-            var watch = new Thread(() => Watch(ending, TimeSpan.FromSeconds(grace)));
-            watch.IsBackground = true;
-            watch.Name = "Preflight EndAfterStop";
-            watch.Start();
-            // Disposed means the workflow is ending: the watch goes on, since a teardown held up is what it is for.
-            return Disposable.Create(ending.Set);
-        });
-    }
-
-    static void Watch(ManualResetEventSlim ending, TimeSpan grace)
-    {
-        string why = null;
-        var stopped = false;
-        OpenRigs.Control.ControlState control = null;
-        while (why == null)
-        {
-            var ended = ending.Wait(100);
-            // Kept once seen: the control server forgets its state as it is disposed.
-            control = OpenRigs.Control.ControlState.Current ?? control;
-            var stop = control == null ? null : control.StopReason;
-            stopped = stop != null;
-            if (stopped) why = "the stop (" + stop + ")";
-            else if (ended) why = "the workflow began to end with no stop, after an error";
-        }
-        Thread.Sleep(grace);
-        // The controller's stop is the one clean end; anything else ending the workflow is an error, so the exit says so.
-        var code = stopped ? 0 : 1;
-        Console.Error.WriteLine("preflight: Bonsai was still running " + grace.TotalSeconds.ToString(Preflight.Invariant) + " s after " + why +
-                                ", its teardown held up, so EndAfterStop ends it with exit code " + code.ToString(Preflight.Invariant));
-        var kill = new Thread(() =>
-        {
-            Thread.Sleep(3000);
-            System.Diagnostics.Process.GetCurrentProcess().Kill();
-        });
-        kill.IsBackground = true;
-        kill.Start();
-        Environment.Exit(code);
     }
 }

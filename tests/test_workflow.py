@@ -74,8 +74,8 @@ def test_its_task_file_is_the_rig_kind_s(wf):
 
 def test_a_stop_ends_headless_bonsai_even_when_its_teardown_is_held_up(wf):
     # GREEN-DOME-2, 15 Nov 2026: End Testing's stop at the speaker question left Bonsai running until the agent's kill
-    # 30 s later. EndAfterStop ends it 2 s after the stop, a source of its own.
-    assert wf.text.count("p1:EndAfterStop") == 1 and "<p1:GraceSeconds>2</p1:GraceSeconds>" in wf.text
+    # 30 s later. OpenRigs.Control's EndAfterStop ends it 2 s after the stop, a source of its own.
+    assert wf.text.count("orcl:EndAfterStop") == 1 and "<orcl:GraceSeconds>2</orcl:GraceSeconds>" in wf.text
 
 
 def test_each_speaker_s_test_sound_is_counted_into_the_check():

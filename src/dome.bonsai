@@ -48,8 +48,8 @@
             </Expression>
             <Expression xsi:type="Combinator">
               <Description>Ends headless Bonsai when it is still running 2 s after the controller's stop: the live view's publisher threads keep the process alive until every device's teardown reaches them, and one held up kept Bonsai running until the agent's kill 30 s after End Testing (GREEN-DOME-2, 15 Nov 2026). Nothing in the editor.</Description>
-              <Combinator xsi:type="p1:EndAfterStop">
-                <p1:GraceSeconds>2</p1:GraceSeconds>
+              <Combinator xsi:type="orcl:EndAfterStop">
+                <orcl:GraceSeconds>2</orcl:GraceSeconds>
               </Combinator>
             </Expression>
           </Nodes>
