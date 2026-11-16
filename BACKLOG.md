@@ -16,3 +16,7 @@ History is in `git log`.
 - Speakers: evidence plus person (Pip, 15 Nov 2026): each test sound sent to the mixer is counted, then the person confirms.
 - The raw rows go through OpenRigs.Logging's `CsvWriter`.
 - `.bonsai\Setup.ps1` is the same in every task repo: each repo needs its own bootstrap.
+
+## Audit round 1 (16 Nov 2026): not recommended
+
+- No task-file schemas in preflight: the repo tests (`tests	est_preflight.py`, `tests	est_workflow.py`) already hold the keys.
