@@ -1,5 +1,5 @@
 """Each rig kind's preflight against the lab's rules for a workflow's hardware (open_rigs.rigs.workflow_lint): the domes'
-(src\\main.bonsai, DomeHardware) and the behaviour boxes' (src\\box.bonsai, BBoxHardware), each its rig list, the lab's
+(src\\main.bonsai, DomeHardware) and the behaviour boxes' (src\\box.bonsai, BehaviorBoxHardware), each its rig list, the lab's
 check (OpenRigs.Devices PreflightChecks) and its task file, never a device opened by hand (Pip, 16 Nov 2026)."""
 
 import re
@@ -17,7 +17,7 @@ DOME = ["TimestampGeneratorGen3-Main", "BehaviorBoard-Main", "LicketySplit-Left"
 # Each workflow: its rig list, the devices it drives, what it taps (the pieces' data and the projector's frames), its task file.
 KINDS = {
     "dome.bonsai": ("DomeHardware", DOME, DOME + ["ProjectionCalibration"], "task-dome.yml"),
-    "box.bonsai": ("BBoxHardware", ["BehaviorBoard-Main", "Camera-Overhead"], ["BehaviorBoard-Main", "Camera-Overhead"], "task-box.yml"),
+    "box.bonsai": ("BehaviorBoxHardware", ["BehaviorBoard-Main", "Camera-Overhead"], ["BehaviorBoard-Main", "Camera-Overhead"], "task-box.yml"),
 }
 
 

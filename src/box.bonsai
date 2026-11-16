@@ -7,7 +7,7 @@
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The behaviour boxes' preflight, run from rig-control's Preflight page and card as the test mouse: the boxes' rig list (OpenRigs.Devices BBoxHardware) opens and readies every device as the box task does, no experiment folder (NoExperimentFolder), and the lab's check (OpenRigs.Devices PreflightChecks) counts each rig.yml device from its piece's data (Taps) and, from Go, writes the raw rows to RawFile with the questions of TaskPath (config\task-box.yml). A device that fails as it opens stops the preflight naming it, as it stops the task. Pulse and Reset on BehaviorBoard-Main are the board's ManualPulses piece. coen_qc_preflight_rig.judge applies the thresholds.</Description>
+  <Description>The behaviour boxes' preflight, run from rig-control's Preflight page and card as the test mouse: the boxes' rig list (OpenRigs.Devices BehaviorBoxHardware) opens and readies every device as the box task does, no experiment folder (NoExperimentFolder), and the lab's check (OpenRigs.Devices PreflightChecks) counts each rig.yml device from its piece's data (Taps) and, from Go, writes the raw rows to RawFile with the questions of TaskPath (config\task-box.yml). A device that fails as it opens stops the preflight naming it, as it stops the task. Pulse and Reset on BehaviorBoard-Main are the board's ManualPulses piece. coen_qc_preflight_rig.judge applies the thresholds.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -53,10 +53,10 @@
       </Expression>
       <Expression xsi:type="GroupWorkflow">
         <Name>Hardware</Name>
-        <Description>The behaviour boxes' rig list (OpenRigs.Devices BBoxHardware), as in the box task: each piece from its rig.yml entry, opened and readied, Ready from its ReadyGate; and the board's ManualPulses (Pulse and Reset).</Description>
+        <Description>The behaviour boxes' rig list (OpenRigs.Devices BehaviorBoxHardware), as in the box task: each piece from its rig.yml entry, opened and readied, Ready from its ReadyGate; and the board's ManualPulses (Pulse and Reset).</Description>
         <Workflow>
           <Nodes>
-            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BBoxHardware.bonsai" />
+            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoxHardware.bonsai" />
             <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.ManualPulses.bonsai">
               <Board>BehaviorBoard-Main</Board>
               <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
