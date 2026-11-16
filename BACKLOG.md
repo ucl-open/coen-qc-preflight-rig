@@ -3,7 +3,7 @@
 ## 2026-11-16 Preflight per rig kind (lib-open-rigs 9845e12, Devices .30)
 
 - Done (Pip, 16 Nov 2026, plan v2 item 4: "QC workflows use the lib pieces, never devices opened by hand"): one workflow per rig kind, `src\main.bonsai` on `DomeHardware` and `src\box.bonsai` on `BBoxHardware`, each with lib's `PreflightChecks` and a task file (`config\task-dome.yml`, `config\task-box.yml`) that rig-control chooses by the rig's rig.yml and writes at Go. Deleted: `PreflightDevices`, `DeviceMonitor`, `RetryPortOpen`, the device-opening branches, the top-level `HarpDeviceData`/`CameraDeviceData` live-view stand-ins, `ShareDeviceData`, `CloseWhen`, the own Ready group, and `BoardWrites` but for Pulse and Reset (`BoardCommands`) and Move and Home (`StepperCommands`), now written into the pieces' command subjects. The rows are rig.yml's devices, so a device the rig list lacks has a row (its error); a fault beyond presence stops the preflight naming the device, as it stops a task. Changed: Pulse adds its line to rig.yml's pulsed lines (it replaced them) and refuses a CameraTrigger or ZapitTrigger line; the projector's window stays open until the stop. Checked: pytest (`tests\test_workflow.py` holds both to workflow_lint), check-workflow-builds, `box.bonsai` built with Bonsai's builders, `scripts\test-pulse.ps1`. Not yet run on a rig, nor headless (a dome run opens the projector full screen).
-- Not yet: check-workflow-builds builds only `src\main.bonsai`; `box.bonsai` is built by hand until it builds every top-level workflow.
+- Done 16 Nov 2026: check-workflow-builds builds `src\main.bonsai` and every other top-level `src\*.bonsai` with ExperimentControl, so `box.bonsai` is built (app-rig-setup).
 
 ## 2026-11-16 Device pieces (lib-open-rigs 5ea5729)
 
