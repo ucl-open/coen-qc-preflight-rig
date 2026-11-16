@@ -75,7 +75,7 @@ camera:
   pupil:
     serialNumber: "26120781"
     exposureTime: 19000    # microseconds
-    gain: 20
+    gain: 0
     binning: 1
   body:
     serialNumber: "23199186"
