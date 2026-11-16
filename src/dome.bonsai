@@ -17,6 +17,7 @@
         <Property Name="ConfigRoot" Description="The folder holding &lt;MACHINE&gt;\rig.yml, read by ReadLabRig; a launch property. LiveView keeps its own ConfigRoot: an edge into it makes Bonsai build it before the pieces, and it then streams nothing." />
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
+        <Description>This machine's rig.yml (ConfigRoot\MACHINE\rig.yml) read once into the lab rig model: RigConfigs, RigFile, RigConfigDirectory and ConfigRoot, which every device piece reads. First, before anything that reads them.</Description>
         <ConfigRoot>C:\Coen-Lab-Local\RigConfigs</ConfigRoot>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:NoExperimentFolder.bonsai">
