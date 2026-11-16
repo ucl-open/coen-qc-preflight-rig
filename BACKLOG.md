@@ -19,4 +19,4 @@ History is in `git log`.
 
 ## Audit round 1 (16 Nov 2026): not recommended
 
-- No task-file schemas in preflight: the repo tests (`tests	est_preflight.py`, `tests	est_workflow.py`) already hold the keys.
+- No task-file schemas in preflight: the repo tests (`tests\test_preflight.py`, `tests\test_workflow.py`) already hold the keys.
