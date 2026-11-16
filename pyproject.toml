@@ -4,12 +4,11 @@ build-backend = "uv_build"
 
 [project]
 name = "coen-qc-preflight-rig"
-description = "The pre-training preflight: one workflow for every rig, its checks chosen from the rig's rig.yml."
+description = "The pre-training preflight: one workflow for each rig kind, checking every device the rig's rig.yml declares."
 license = "MIT"
 requires-python = ">=3.11, <3.12"
 version = "0.1.0"
 dependencies = [
-  "swc-aeon>=0.2.0",
   "open-rigs",
   "pyyaml",
 ]
@@ -22,7 +21,6 @@ dev = ["pytest"]
 
 [tool.uv.sources]
 open-rigs = {git = "https://github.com/Coen-Lab/lib-open-rigs", rev = "25aa824c45f44786717a14f2df0745687c11aaca"}
-swc-aeon = { git = "https://github.com/SainsburyWellcomeCentre/aeon_api.git", branch = "main" }
 
 [tool.ruff]
 line-length = 120

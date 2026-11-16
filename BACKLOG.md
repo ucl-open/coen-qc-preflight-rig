@@ -11,7 +11,7 @@ History is in `git log`.
 
 ## Decided
 
-- One workflow per rig kind on its rig list, no device opened by hand (Pip, 16 Nov 2026): `src\dome.bonsai` (`DomeHardware`, `config\task-dome.yml`) and `src\box.bonsai` (`BBoxHardware`, `config\task-box.yml`).
+- One workflow per rig kind on its rig list, no device opened by hand (Pip, 16 Nov 2026): `src\dome.bonsai` (`DomeHardware`, `config\task-dome.yml`) and `src\box.bonsai` (`BehaviorBoxHardware`, `config\task-box.yml`).
 - Pulse and Reset are lib's `BehaviorBoard.ManualPulses`; the spouts move by the lick spout stage's own commands.
 - Speakers: evidence plus person (Pip, 15 Nov 2026): each test sound sent to the mixer is counted, then the person confirms.
 - The raw rows go through OpenRigs.Logging's `CsvWriter`.

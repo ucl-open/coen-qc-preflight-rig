@@ -89,6 +89,19 @@ def test_a_slow_camera_fails(tmp_path):
     assert _judge(tmp_path, rows)["devices"][1]["why"] == "40.0 frames/s, 49.0 needed"
 
 
+def test_a_camera_is_judged_by_the_trigger_its_wiring_line_names(tmp_path):
+    # A camera on DO1 runs at trigger1Frequency (OpenRigs.Devices CameraTrigger), not the board's trigger0Frequency.
+    data = yaml.safe_load((FIXTURES / "BBOX-1.yml").read_text(encoding="utf-8"))
+    board = data["behaviorBoard"]["main"]
+    board["wiring"] = {"DO1": {"device": "CameraTrigger", "targets": ["Camera-Overhead"]}}
+    board["cameraTriggerController"].update(trigger0Enabled=False, trigger1Enabled=True, trigger1Frequency=30)
+    f = tmp_path / "rig.yml"
+    f.write_text(yaml.safe_dump(data), encoding="utf-8")
+    rows = GOOD_BOX[:2] + [("Camera-Overhead", "frames", "150", ""), ("Camera-Overhead", "seconds", "5", "")]
+    record = judge.judge(f, _raw(tmp_path, rows), THRESHOLDS, "BBOX-1", "abc")
+    assert record["passed"], record
+
+
 def test_a_device_rig_yml_does_not_declare_fails(tmp_path):
     record = _judge(tmp_path, GOOD_BOX + [("StepperDriver-A", "messages", "5", "")])
     assert not record["passed"]

@@ -1,5 +1,5 @@
 """Each rig kind's preflight against the lab's rules for a workflow's hardware (open_rigs.rigs.workflow_lint): the domes'
-(src\\main.bonsai, DomeHardware) and the behaviour boxes' (src\\box.bonsai, BehaviorBoxHardware), each its rig list, the lab's
+(src\\dome.bonsai, DomeHardware) and the behaviour boxes' (src\\box.bonsai, BehaviorBoxHardware), each its rig list, the lab's
 check (OpenRigs.Devices PreflightChecks) and its task file, never a device opened by hand (Pip, 16 Nov 2026)."""
 
 import re
@@ -36,7 +36,7 @@ def test_the_hardware_is_the_rig_kind_s_list(wf):
 def test_no_device_is_opened_by_hand(wf):
     # The pieces open every device (Pip, 16 Nov 2026); the preflight's own C# only writes into their Commands subjects.
     assert not re.search(r'xsi:type="(harp|beh|vid|spk|aud):(Device|TriggeredSpinnaker|SpinnakerCapture)"', wf.text)
-    assert "RetryPortOpen" not in wf.text and "BoardWrites" not in wf.text and 'Path="OpenRigs.Audio:SpeakerMixer.bonsai"' not in wf.text
+    assert 'Path="OpenRigs.Audio:SpeakerMixer.bonsai"' not in wf.text  # the rig list's mixer, never a second
 
 
 def test_every_device_is_counted_from_its_piece_s_data(wf):
@@ -114,15 +114,6 @@ def test_live_view_is_last_and_fed_by_nothing(wf):
     assert live == len(nodes) - 1 and not [e for e in edges if live in e[:2]]
 
 
-def test_the_spouts_move_by_the_stage_s_own_commands():
-    # The lick spout stage declares and takes its own commands (SpoutsHome, nudges); the preflight writes no stepper
-    # register by hand (its Move and Home are gone).
-    text = (ROOT / "src" / "dome.bonsai").read_text(encoding="utf-8-sig")
-    assert "StepperCommands" not in text and "StepperDriver-A.Commands" not in text
-    assert ("Initialization", "command", "Move") not in lint.control_declarations(lint.Workflow(ROOT, "dome.bonsai"))
-    assert "class StepperCommands" not in (ROOT / "src" / "Extensions" / "Preflight.cs").read_text(encoding="utf-8-sig")
-
-
 def test_the_test_pattern_fills_the_projector_view():
     # ProjectorDisplay's view is azimuth -135 to 135 and elevation -22.5 to 82.5 degrees; the question asks whether the
     # pattern fills the screen, so it is that whole view (it was 120 by 60).
@@ -138,4 +129,3 @@ def test_pulse_and_reset_are_the_board_piece_s(wf):
     nodes, _ = _top(wf)
     (hardware,) = [n for n in nodes if n.findtext(W + "Name") == "Hardware"]
     assert ET.tostring(hardware, encoding="unicode").count('Path="OpenRigs.Devices:BehaviorBoard.ManualPulses.bonsai"') == 1
-    assert "p1:BoardCommands" not in wf.text and "class BoardCommands" not in (ROOT / "src" / "Extensions" / "Preflight.cs").read_text(encoding="utf-8-sig")

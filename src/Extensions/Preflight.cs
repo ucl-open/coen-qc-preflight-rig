@@ -89,11 +89,12 @@ public class CountSpeakerSounds
 /// to end for any other reason. Headless Bonsai returns from Main as soon as its runner has the stop's error, and the
 /// process then lasts while any foreground thread does: here the live view's two publishers, which end only once
 /// their subscriptions are disposed, last of all. A disposal held up anywhere before them kept Bonsai running until
-/// the agent killed it 30 s after End Testing's stop (GREEN-DOME-2, 15 Nov 2026). In the editor it does nothing.
+/// the agent killed it 30 s after End Testing's stop (GREEN-DOME-2, 15 Nov 2026). Exit code 0 after the controller's
+/// stop, 1 after any other end (an error). In the editor it does nothing.
 /// </summary>
 [Combinator]
 [WorkflowElementCategory(ElementCategory.Source)]
-[Description("Ends headless Bonsai if it is still running GraceSeconds after the controller's stop (or after the workflow began to end); nothing in the editor.")]
+[Description("Ends headless Bonsai if it is still running GraceSeconds after the controller's stop (exit code 0) or after the workflow began to end for any other reason, an error (exit code 1); nothing in the editor.")]
 public class EndAfterStop
 {
     double graceSeconds = 2;
@@ -122,6 +123,7 @@ public class EndAfterStop
     static void Watch(ManualResetEventSlim ending, TimeSpan grace)
     {
         string why = null;
+        var stopped = false;
         OpenRigs.Control.ControlState control = null;
         while (why == null)
         {
@@ -129,12 +131,15 @@ public class EndAfterStop
             // Kept once seen: the control server forgets its state as it is disposed.
             control = OpenRigs.Control.ControlState.Current ?? control;
             var stop = control == null ? null : control.StopReason;
-            if (stop != null) why = "the stop (" + stop + ")";
-            else if (ended) why = "the workflow began to end";
+            stopped = stop != null;
+            if (stopped) why = "the stop (" + stop + ")";
+            else if (ended) why = "the workflow began to end with no stop, after an error";
         }
         Thread.Sleep(grace);
+        // The controller's stop is the one clean end; anything else ending the workflow is an error, so the exit says so.
+        var code = stopped ? 0 : 1;
         Console.Error.WriteLine("preflight: Bonsai was still running " + grace.TotalSeconds.ToString(Preflight.Invariant) + " s after " + why +
-                                ", its teardown held up, so EndAfterStop ends it");
+                                ", its teardown held up, so EndAfterStop ends it with exit code " + code.ToString(Preflight.Invariant));
         var kill = new Thread(() =>
         {
             Thread.Sleep(3000);
@@ -142,6 +147,6 @@ public class EndAfterStop
         });
         kill.IsBackground = true;
         kill.Start();
-        Environment.Exit(0);
+        Environment.Exit(code);
     }
 }

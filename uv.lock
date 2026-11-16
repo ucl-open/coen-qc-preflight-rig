@@ -23,7 +23,6 @@ source = { editable = "." }
 dependencies = [
     { name = "open-rigs" },
     { name = "pyyaml" },
-    { name = "swc-aeon" },
 ]
 
 [package.dev-dependencies]
@@ -35,7 +34,6 @@ dev = [
 requires-dist = [
     { name = "open-rigs", git = "https://github.com/Coen-Lab/lib-open-rigs?rev=25aa824c45f44786717a14f2df0745687c11aaca" },
     { name = "pyyaml" },
-    { name = "swc-aeon", git = "https://github.com/SainsburyWellcomeCentre/aeon_api.git?branch=main" },
 ]
 
 [package.metadata.requires-dev]
@@ -449,8 +447,8 @@ wheels = [
 
 [[package]]
 name = "swc-aeon"
-version = "0.2.1.dev7+g7cd561d38"
-source = { git = "https://github.com/SainsburyWellcomeCentre/aeon_api.git?branch=main#7cd561d382011b9fbdcafe827cd92a2804b6799f" }
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dotmap" },
     { name = "harp-python" },
@@ -460,6 +458,10 @@ dependencies = [
     { name = "pandas" },
     { name = "pydantic" },
     { name = "pydantic-yaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/95/bd/5fdc5c817379d32813b9559e9251e6835c04411bd6e239a58021b5989e1a/swc_aeon-0.2.0.tar.gz", hash = "sha256:c92179f89cc182c1be72568564a0cb184b1b921c139994b4be81425f701ce444", size = 146116, upload-time = "2026-03-16T14:13:53.563Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d0/d5/8b879cc6a295f6d22fc7027f9c7fc579af217a0d7fa46ced4ca8374f3ee8/swc_aeon-0.2.0-py3-none-any.whl", hash = "sha256:65b3964f54baafd6339959430a79e13231dc62313207ada52f9fe3605a4ec25c", size = 26887, upload-time = "2026-03-16T14:13:54.597Z" },
 ]
 
 [[package]]

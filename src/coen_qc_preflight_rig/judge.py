@@ -43,12 +43,15 @@ def _speakers(device: Planned) -> list[str]:
     return list(getattr(device.settings, "speakers", None) or {})
 
 
-def _trigger_hz(rig: LabRig) -> float | None:
-    """The first behavior board's trigger0Frequency: the frame rate a triggered camera should run at."""
+def _trigger_hz(rig: LabRig, camera: str) -> float | None:
+    """The frame rate `camera` should run at: the frequency of the board trigger whose wiring line (CameraTrigger, DO0
+    or DO1) names it in targets, as OpenRigs.Devices CameraTrigger finds it at Start."""
     for board in rig.behavior_board.values():
-        trigger = getattr(board, "camera_trigger_controller", None)
-        if trigger is not None and getattr(trigger, "trigger0_frequency", None):
-            return float(trigger.trigger0_frequency)
+        trigger = board.camera_trigger_controller
+        for output, field in enumerate(("do0", "do1")):
+            line = getattr(board.wiring, field, None) if board.wiring else None
+            if trigger is not None and line is not None and line.device == "CameraTrigger" and camera in (line.targets or []):
+                return float(trigger.trigger0_frequency if output == 0 else trigger.trigger1_frequency)
     return None
 
 
@@ -76,7 +79,7 @@ def device_verdict(device: Planned, measures: dict | None, limits: dict, rig: La
         n = _number(measures, "messages")
         return "" if n is not None and n >= limits["minMessages"] else f"{n or 0:g} messages, {limits['minMessages']} needed"
     if "minRateFraction" in limits:
-        frames, seconds, hz = _number(measures, "frames"), _number(measures, "seconds"), _trigger_hz(rig)
+        frames, seconds, hz = _number(measures, "frames"), _number(measures, "seconds"), _trigger_hz(rig, device.name)
         if not frames or not seconds or not hz:
             return "no frames" if not frames else "no trigger frequency to judge by"
         rate = frames / seconds
