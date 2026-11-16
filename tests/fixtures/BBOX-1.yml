@@ -14,13 +14,15 @@ behaviorBoard:
     runningWheel:
       countsPerRev: 4096
       wheelDiameterMm: 150.0
+    wiring:
+      DO0: { device: CameraTrigger, targets: [Camera-Overhead] }
 camera:
   overhead:
     binning: 1
     discriminatorType: SpinnakerCamera
     exposureTime: 3000.0
     gain: 1.0
+    pixelFormat: Mono8
     serialNumber: '23201539'
-    triggerFrequency: 50.0
 rigId: S1
 rootPath: C:\Coen-Lab-Local\Acquired-Data

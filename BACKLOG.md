@@ -1,5 +1,10 @@
 # Backlog
 
+## 2026-11-16 Device pieces (lib-open-rigs 5ea5729)
+
+- Done: lib 5ea5729's packages; `tests\fixtures\BBOX-1.yml` as the share's BBOX-1 rig.yml after the cut (camera `triggerFrequency` gone, which the lab rig model refuses; `pixelFormat: Mono8`; DO0 CameraTrigger wiring to Camera-Overhead, which the model requires for a camera). pytest, check-workflow-builds and `scripts\test-pulse.ps1` green.
+- Not yet, waiting for Pip: the preflight onto the lab's pieces (Pip, 16 Nov 2026: QC workflows use the same pieces as the tasks). The pieces stop the whole workflow on a dead or missing device, where the preflight reports each device's failure as its own row; the decisions and a design are in the session's handoff (DomeHardware, the preflight's monitors reading the pieces' `.Data`, `BoardWrites` cut to Pulse, Reset, Move and Home into the pieces' command subjects, the own Ready, RigFile, ReadyStages and mixer deleted).
+
 ## Rig test, GREEN-DOME-2 (15 Nov 2026)
 
 - Done: End Testing's stop at the speaker question left Bonsai running until the agent's kill 30 s later. Headless Bonsai returns from Main when its runner has the stop's error and tears the workflow down on the control server's thread; the process then lasts while a foreground thread does, here only the live view's publishers (StreamController's `ObserveOn` NewThreadScheduler), which end when the teardown reaches StreamDevices, last. Reproduced headless with a test ConfigRoot (fake COM ports, RDP): about 1 stop in 6 at the speaker question was held, the speakers still playing every 5 s after the stop; ClrMD stacks showed the teardown blocked in `ReplaySubject<OpenTK.Matrix4>` Unsubscribe under the projection's BonVision draw chain, which is disposed from the control thread while the render thread draws. `EndAfterStop` (Initialization) ends headless Bonsai 2 s after the stop, saying so on stderr. Not yet: the BonVision teardown itself (a dome task's stop was held the same way, 14 Nov 2026 17:35), which wants full stacks of a held stop (set `GraceSeconds` to 0 in a scratch copy).
