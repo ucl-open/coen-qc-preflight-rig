@@ -2,7 +2,6 @@
 (src\\dome.bonsai, DomeHardware) and the behaviour boxes' (src\\box.bonsai, BehaviorBoxHardware), each its rig list, the lab's
 check (OpenRigs.Devices PreflightChecks) and its task file, never a device opened by hand (Pip, 16 Nov 2026)."""
 
-import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -35,7 +34,7 @@ def test_the_hardware_is_the_rig_kind_s_list(wf):
 
 def test_no_device_is_opened_by_hand(wf):
     # The pieces open every device (Pip, 16 Nov 2026); the preflight's own C# only writes into their Commands subjects.
-    assert not re.search(r'xsi:type="(harp|beh|vid|spk|aud):(Device|TriggeredSpinnaker|SpinnakerCapture)"', wf.text)
+    assert lint.hand_opened_devices(wf) == []
     assert 'Path="OpenRigs.Audio:SpeakerMixer.bonsai"' not in wf.text  # the rig list's mixer, never a second
 
 
@@ -107,11 +106,11 @@ def test_the_rig_list_is_in_a_hardware_group_as_in_every_task(wf):
 
 
 def test_live_view_is_last_and_fed_by_nothing(wf):
-    # StreamDevices finds only subjects built before it: an edge into it (even a ConfigRoot mapping) makes Bonsai build
-    # it before the pieces, and it streams nothing.
-    nodes, edges = _top(wf)
-    (live,) = [i for i, n in enumerate(nodes) if n.get(XSI) == "lv:StreamDevices"]
-    assert live == len(nodes) - 1 and not [e for e in edges if live in e[:2]]
+    assert lint.live_view_problems(wf) == []
+
+
+def test_the_launch_id_reaches_the_controller(wf):
+    assert lint.launch_id_problems(wf) == []
 
 
 def test_the_test_pattern_fills_the_projector_view():

@@ -25,6 +25,7 @@
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="SubjectId" />
         <Property Name="SessionId" />
+        <Property Name="LaunchId" Description="The launcher's run id; the launch's own, from rig-control." />
       </Expression>
       <Expression xsi:type="GroupWorkflow">
         <Name>Initialization</Name>
@@ -34,10 +35,12 @@
             <Expression xsi:type="ExternalizedMapping">
               <Property Name="SubjectId" />
               <Property Name="SessionId" />
+              <Property Name="LaunchId" />
             </Expression>
             <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Control:ExperimentControl.bonsai">
               <SubjectId />
               <SessionId />
+              <LaunchId />
               <ControlEndpoint>@tcp://127.0.0.1:5561</ControlEndpoint>
               <Parameters />
               <Commands />
