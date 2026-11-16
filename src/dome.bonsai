@@ -10,7 +10,7 @@
                  xmlns:dsp="clr-namespace:Bonsai.Dsp;assembly=Bonsai.Dsp"
                  xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The domes' preflight, run from rig-control's Preflight page and card as the test mouse: the domes' rig list (OpenRigs.Devices DomeHardware) opens and readies every device as a task does, no experiment folder (NoExperimentFolder), and the lab's check (OpenRigs.Devices PreflightChecks) counts each rig.yml device from its piece's data (Taps) and, from Go, writes the raw rows to RawFile with the questions of TaskPath (config\task-dome.yml). A device that fails as it opens stops the preflight naming it, as it stops a task. Pulse and Reset on BehaviorBoard-Main are the board's ManualPulses piece; the spouts move by the lick spout stage's own commands. Each rig.yml speaker plays a test sound while its question is asked (SpeakerTest), and the projector shows a test pattern (TestPattern). coen_qc_preflight_rig.judge applies the thresholds.</Description>
+  <Description>The domes' preflight, run from rig-control's Preflight page and card as the test mouse: the domes' rig list (OpenRigs.Devices DomeHardware) opens and readies every device as a task does, no experiment folder (NoExperimentFolder), and the lab's check (OpenRigs.Devices PreflightChecks) counts each rig.yml device from its piece's data (the rig list's taps, OpenRigs.Devices DomeHardwareTaps) and, from Go, writes the raw rows to RawFile with the questions of TaskPath (config\task-dome.yml). A device that fails as it opens stops the preflight naming it, as it stops a task. Pulse and Reset on BehaviorBoard-Main are the board's ManualPulses piece; the spouts move by the lick spout stage's own commands. Each rig.yml speaker plays a test sound while its question is asked (SpeakerTest), and the projector shows a test pattern (TestPattern). coen_qc_preflight_rig.judge applies the thresholds.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -89,146 +89,7 @@
         <RawFile>preflight-raw.csv</RawFile>
         <TaskPath>..\config\task-dome.yml</TaskPath>
       </Expression>
-      <Expression xsi:type="GroupWorkflow">
-        <Name>Taps</Name>
-        <Description>Each device piece's data, and the projector's frames (DrawStimuli), as the check's ticks (OpenRigs.Devices PreflightTap into DeviceTicks), by the device's rig.yml name.</Description>
-        <Workflow>
-          <Nodes>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>TimestampGeneratorGen3-Main.Data</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="dev:PreflightTap">
-                <dev:Device>TimestampGeneratorGen3-Main</dev:Device>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="MulticastSubject">
-              <Name>DeviceTicks</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>BehaviorBoard-Main.Data</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="dev:PreflightTap">
-                <dev:Device>BehaviorBoard-Main</dev:Device>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="MulticastSubject">
-              <Name>DeviceTicks</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>LicketySplit-Left.Data</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="dev:PreflightTap">
-                <dev:Device>LicketySplit-Left</dev:Device>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="MulticastSubject">
-              <Name>DeviceTicks</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>LicketySplit-Right.Data</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="dev:PreflightTap">
-                <dev:Device>LicketySplit-Right</dev:Device>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="MulticastSubject">
-              <Name>DeviceTicks</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>StepperDriver-A.Data</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="dev:PreflightTap">
-                <dev:Device>StepperDriver-A</dev:Device>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="MulticastSubject">
-              <Name>DeviceTicks</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>StepperDriver-B.Data</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="dev:PreflightTap">
-                <dev:Device>StepperDriver-B</dev:Device>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="MulticastSubject">
-              <Name>DeviceTicks</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>Camera-Face.Data</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="dev:PreflightTap">
-                <dev:Device>Camera-Face</dev:Device>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="MulticastSubject">
-              <Name>DeviceTicks</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>Camera-Pupil.Data</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="dev:PreflightTap">
-                <dev:Device>Camera-Pupil</dev:Device>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="MulticastSubject">
-              <Name>DeviceTicks</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>Camera-Body.Data</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="dev:PreflightTap">
-                <dev:Device>Camera-Body</dev:Device>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="MulticastSubject">
-              <Name>DeviceTicks</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>DrawStimuli</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="dev:PreflightTap">
-                <dev:Device>ProjectionCalibration</dev:Device>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="MulticastSubject">
-              <Name>DeviceTicks</Name>
-            </Expression>
-          </Nodes>
-          <Edges>
-            <Edge From="0" To="1" Label="Source1" />
-            <Edge From="1" To="2" Label="Source1" />
-            <Edge From="3" To="4" Label="Source1" />
-            <Edge From="4" To="5" Label="Source1" />
-            <Edge From="6" To="7" Label="Source1" />
-            <Edge From="7" To="8" Label="Source1" />
-            <Edge From="9" To="10" Label="Source1" />
-            <Edge From="10" To="11" Label="Source1" />
-            <Edge From="12" To="13" Label="Source1" />
-            <Edge From="13" To="14" Label="Source1" />
-            <Edge From="15" To="16" Label="Source1" />
-            <Edge From="16" To="17" Label="Source1" />
-            <Edge From="18" To="19" Label="Source1" />
-            <Edge From="19" To="20" Label="Source1" />
-            <Edge From="21" To="22" Label="Source1" />
-            <Edge From="22" To="23" Label="Source1" />
-            <Edge From="24" To="25" Label="Source1" />
-            <Edge From="25" To="26" Label="Source1" />
-            <Edge From="27" To="28" Label="Source1" />
-            <Edge From="28" To="29" Label="Source1" />
-          </Edges>
-        </Workflow>
-      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:DomeHardwareTaps.bonsai" />
       <Expression xsi:type="GroupWorkflow">
         <Name>SpeakerTest</Name>
         <Description>A test sound for each rig.yml speaker, laid out by OpenRigs.Audio SpeakerBuffer on that speaker's channel alone, equalised, at the lab's default level (SpeakerBuffer's LevelDbfs, -30 dBFS RMS), through DomeHardware's mixer. Once the check asks "SpeakerArray: ..." (CheckEvents), the speakers play their test sound in rig.yml's order, one after another, every 5 s until the person's Confirm for SpeakerArray (PreflightChecks' Confirms); each sound the mixer is sent is counted for its speaker (CountSpeakerSounds into SpeakerSounds: the devices metric and the raw rows). The test sound is a 0.3 s 1 kHz tone then 0.3 s of silence (Bonsai.Dsp FunctionGenerator at 48 kHz).</Description>

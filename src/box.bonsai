@@ -3,11 +3,10 @@
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:p1="clr-namespace:;assembly=Extensions"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
-                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The behaviour boxes' preflight, run from rig-control's Preflight page and card as the test mouse: the boxes' rig list (OpenRigs.Devices BehaviorBoxHardware) opens and readies every device as the box task does, no experiment folder (NoExperimentFolder), and the lab's check (OpenRigs.Devices PreflightChecks) counts each rig.yml device from its piece's data (Taps) and, from Go, writes the raw rows to RawFile with the questions of TaskPath (config\task-box.yml). A device that fails as it opens stops the preflight naming it, as it stops the task. Pulse and Reset on BehaviorBoard-Main are the board's ManualPulses piece. coen_qc_preflight_rig.judge applies the thresholds.</Description>
+  <Description>The behaviour boxes' preflight, run from rig-control's Preflight page and card as the test mouse: the boxes' rig list (OpenRigs.Devices BehaviorBoxHardware) opens and readies every device as the box task does, no experiment folder (NoExperimentFolder), and the lab's check (OpenRigs.Devices PreflightChecks) counts each rig.yml device from its piece's data (the rig list's taps, OpenRigs.Devices BehaviorBoxHardwareTaps) and, from Go, writes the raw rows to RawFile with the questions of TaskPath (config\task-box.yml). A device that fails as it opens stops the preflight naming it, as it stops the task. Pulse and Reset on BehaviorBoard-Main are the board's ManualPulses piece. coen_qc_preflight_rig.judge applies the thresholds.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
@@ -76,42 +75,7 @@
         <RawFile>preflight-raw.csv</RawFile>
         <TaskPath>..\config\task-box.yml</TaskPath>
       </Expression>
-      <Expression xsi:type="GroupWorkflow">
-        <Name>Taps</Name>
-        <Description>Each device piece's data as the check's ticks (OpenRigs.Devices PreflightTap into DeviceTicks), by the device's rig.yml name.</Description>
-        <Workflow>
-          <Nodes>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>BehaviorBoard-Main.Data</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="dev:PreflightTap">
-                <dev:Device>BehaviorBoard-Main</dev:Device>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="MulticastSubject">
-              <Name>DeviceTicks</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>Camera-Overhead.Data</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="dev:PreflightTap">
-                <dev:Device>Camera-Overhead</dev:Device>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="MulticastSubject">
-              <Name>DeviceTicks</Name>
-            </Expression>
-          </Nodes>
-          <Edges>
-            <Edge From="0" To="1" Label="Source1" />
-            <Edge From="1" To="2" Label="Source1" />
-            <Edge From="3" To="4" Label="Source1" />
-            <Edge From="4" To="5" Label="Source1" />
-          </Edges>
-        </Workflow>
-      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoxHardwareTaps.bonsai" />
       <Expression xsi:type="lv:StreamDevices">
         <Name>LiveView</Name>
         <Description>Streams every rig.yml device the pieces publish (their &lt;Device&gt;.Data) to rig-control's live view (OpenRigs.LiveView): data on TCP 5556, video on 5558. No experiment folder, so the session key stays ready. Last in the workflow: it finds only subjects built before it.</Description>

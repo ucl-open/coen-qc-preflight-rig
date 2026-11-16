@@ -40,8 +40,8 @@ behaviorBoard:
     # What each line drives (lab rig model, open_rigs.rigs.lab_rig): one RewardValve per side and one ZapitTrigger.
     wiring:
       DO0: { device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }
-      DO1: { device: RewardValve, side: left }
-      DO2: { device: RewardValve, side: right }
+      DO1: { device: RewardValve, name: left }
+      DO2: { device: RewardValve, name: right }
       DO3: { device: ZapitTrigger, note: also the masking light }
     cameraTriggerController:
       trigger0Enabled: true     # camera trigger 0 shares the DO0 pin

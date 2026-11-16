@@ -13,10 +13,10 @@ ROOT = Path(__file__).parents[1]
 W, XSI = lint.W, lint.XSI
 DOME = ["TimestampGeneratorGen3-Main", "BehaviorBoard-Main", "LicketySplit-Left", "LicketySplit-Right",
         "StepperDriver-A", "StepperDriver-B", "Camera-Face", "Camera-Pupil", "Camera-Body"]
-# Each workflow: its rig list, the devices it drives, what it taps (the pieces' data and the projector's frames), its task file.
+# Each workflow: its rig list, the devices it drives, its task file.
 KINDS = {
-    "dome.bonsai": ("DomeHardware", DOME, DOME + ["ProjectionCalibration"], "task-dome.yml"),
-    "box.bonsai": ("BehaviorBoxHardware", ["BehaviorBoard-Main", "Camera-Overhead"], ["BehaviorBoard-Main", "Camera-Overhead"], "task-box.yml"),
+    "dome.bonsai": ("DomeHardware", DOME, "task-dome.yml"),
+    "box.bonsai": ("BehaviorBoxHardware", ["BehaviorBoard-Main", "Camera-Overhead"], "task-box.yml"),
 }
 
 
@@ -26,7 +26,7 @@ def wf(request):
 
 
 def test_the_hardware_is_the_rig_kind_s_list(wf):
-    rig_list, devices, _, _ = KINDS[wf.file]
+    rig_list, devices, _ = KINDS[wf.file]
     assert lint.hardware_problems(wf) == []
     assert f'Path="{lint.DEVICES}{rig_list}.bonsai"' in wf.text
     assert [name for name, _ in lint.required_devices(wf)] == devices
@@ -38,31 +38,22 @@ def test_no_device_is_opened_by_hand(wf):
     assert 'Path="OpenRigs.Audio:SpeakerMixer.bonsai"' not in wf.text  # the rig list's mixer, never a second
 
 
-def test_every_device_is_counted_from_its_piece_s_data(wf):
-    _, _, tapped, _ = KINDS[wf.file]
-    nodes, edges = lint.nodes_and_edges(next(e for e in wf.root.iter(W + "Expression") if e.findtext(W + "Name") == "Taps").find(W + "Workflow"))
-    taps = [i for i, n in enumerate(nodes) if (n.find(W + "Combinator") is not None and n.find(W + "Combinator").get(XSI) == "dev:PreflightTap")]
-    feeds = {b: a for a, b, _ in edges}
-    out = {a: b for a, b, _ in edges}
-    found = []
-    for i in taps:
-        device = nodes[i].find(W + "Combinator").findtext("{clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices}Device")
-        source = nodes[feeds[i]].findtext(W + "Name")
-        assert source == ("DrawStimuli" if device == "ProjectionCalibration" else f"{device}.Data")
-        assert (nodes[out[i]].get(XSI), nodes[out[i]].findtext(W + "Name")) == ("MulticastSubject", "DeviceTicks")
-        found.append(device)
-    assert found == tapped
+def test_every_device_is_counted_by_the_rig_list_s_taps(wf):
+    # The rig list's taps include (DomeHardwareTaps, BehaviorBoxHardwareTaps) taps each piece's data, and the dome's
+    # projector frames, into DeviceTicks; this repo's own Taps group did until lib's taps includes (16 Nov 2026).
+    assert lint.preflight_tap_problems(wf) == []
+    assert f'Path="{lint.DEVICES}{KINDS[wf.file][0]}Taps.bonsai"' in wf.text
 
 
 def test_the_check_is_the_lab_s_with_no_experiment_folder(wf):
     assert wf.text.count(f'Path="{lint.PREFLIGHT_CHECKS}"') == 1
-    assert [p for p in lint.no_experiment_folder_problems(wf) if "has no SubjectId" not in p] == []  # the pinned lib wants one set; the next lib defaults it (drop the filter at that bump)
+    assert lint.no_experiment_folder_problems(wf) == []
     assert lint.undeclared_commands(wf) == [] and lint.declared_twice(wf) == []
     assert ("PreflightChecks", "command", "Confirm") in lint.control_declarations(wf)
 
 
 def test_its_task_file_is_the_rig_kind_s(wf):
-    _, _, _, task = KINDS[wf.file]
+    _, _, task = KINDS[wf.file]
     (checks,) = [e for e in wf.root.iter(W + "Expression") if e.get("Path") == lint.PREFLIGHT_CHECKS]
     assert checks.findtext(W + "TaskPath") == f"..\\config\\{task}"
     doc = yaml.safe_load((ROOT / "config" / task).read_text(encoding="utf-8"))
