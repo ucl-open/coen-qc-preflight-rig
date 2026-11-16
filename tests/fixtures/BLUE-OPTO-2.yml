@@ -83,10 +83,10 @@ camera:
     gain: 0
     binning: 1
 
-# Production's files, read only; copy them to calibration\ beside this file when the rig switches over.
+# Relative to this file's folder: production's files copied into calibration\ beside it.
 projectionCalibration:
-  meshMapPath: C:\RigConfigs\MeshMap.csv
-  gammaLutPath: C:\RigConfigs\gammalut.bmp
+  meshMapPath: calibration/MeshMap.csv
+  gammaLutPath: calibration/gammalut.bmp
 
 speakerArray:
   device:

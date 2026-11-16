@@ -99,8 +99,8 @@ camera:
     binning: 1
 
 projectionCalibration:
-  meshMapPath: C:\Coen-Lab-Local\RigConfigs\GREEN-DOME-1\calibration\MeshMap.csv
-  gammaLutPath: C:\Coen-Lab-Local\RigConfigs\GREEN-DOME-1\calibration\gammalut.bmp
+  meshMapPath: calibration/MeshMap.csv
+  gammaLutPath: calibration/gammalut.bmp
 
 speakerArray:
   device:
