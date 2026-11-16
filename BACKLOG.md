@@ -3,6 +3,8 @@
 ## 2026-11-16 Review findings (fix6a)
 
 - Done: a DOPort pulse was cleared by a PC timer and `Reset` cleared only DO0-DO3, so a stop or `EndAfterStop` during a DOPort pulse left that line high (a valve on it kept running). `BoardCommands` now has the board time every pulse, DOPort0-2 by `PulseDOPort0-2` (registers 46-48) as DO0-3 by `PulseDO0-3`, and `Reset` closes DOPort0-2 too. `scripts\test-pulse.ps1` models the board and stops 100 ms into a 500 ms pulse on DOPort0, DOPort2, DO1 and DO3: no line ends high (DOPort failed on the old code). Not yet run on a rig.
+- Done (lib-open-rigs f333a91, Devices .31, here d4d3d13): `PreflightTap`'s once-a-second "open" tick made every tapped device settled, opened or not. A device now settles on its first item; until then, past `OpenSeconds`, it has its error ("nothing has come from it"), which `RunCheck` drops once it sends. `DeviceTick` lost `Data`. Tested in `OpenRigs.Devices.Tests` (`ATappedDeviceThatSendsNothingHasItsError`, failed on the old code).
+- Done (same commit): `TheCheckCountsAsksAndFinishesWithItsFileClosed` runs lib's `PreflightChecks` headless from Go (a board stand-in counted for 1 s, its question answered by `Confirm`) to `Finished`, the raw file closed with every row; about 4 s.
 
 ## 2026-11-16 Preflight per rig kind (lib-open-rigs 9845e12, Devices .30)
 
