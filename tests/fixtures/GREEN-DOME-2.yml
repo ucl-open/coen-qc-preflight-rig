@@ -1,0 +1,157 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Coen-Lab/lib-open-rigs/main/src/open_rigs/schemas/lab_rig.json
+# GREEN-DOME-2, in the lab rig model (lib-open-rigs open_rigs.rigs.lab_rig, laid out as its rig-template.yml),
+# as BLUE-OPTO-1's. Ports, cameras, valve widths and stage position from production's RigConfigs.cs
+# (GreenDome2configs); usbSerials from rig-setup's 7 Nov 2026 hardware scan.
+# Production (ActiveExperiments) does not read this file.
+#
+# Each kind of device is a group of named entries: behaviorBoard: main: is BehaviorBoard-Main in the
+# data and in live view.
+rootPath: C:\Coen-Lab-Local\Acquired-Data
+rigId: G2                 # rig-control's session numbering (G for green; D2 until 14 Nov 2026)
+
+behaviorBoard:
+  main:
+    portName: COM10
+    usbSerial: BG01WA06
+    pulseController:
+      outputPulseEnable: "DO1, DO2"   # never DO3: the ZapitTrigger line is held until the workflow clears it
+      outputs:
+        DO1: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json }   # left reward valve (was a fixed 70 ms)
+        DO2: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO2.json }   # right reward valve (was a fixed 72 ms)
+        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }   # ZapitTrigger line: held, not pulsed, so no width
+    # What each line drives (lab rig model): one RewardValve per spout, named left and right, and the ZapitTrigger.
+    wiring:
+      DO0: { device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }
+      DO1: { device: RewardValve, name: left }
+      DO2: { device: RewardValve, name: right }
+      DO3: { device: ZapitTrigger, note: also the masking light }
+    cameraTriggerController:
+      trigger0Enabled: true     # camera trigger 0 shares the DO0 pin
+      trigger0Frequency: 50     # Hz
+      trigger1Enabled: false    # camera trigger 1 shares the DO1 pin, which drives the left valve
+      trigger1Frequency: 50     # Hz, used only if trigger 1 is enabled
+    runningWheel:
+      wheelDiameterMm: 75
+      countsPerRev: 4096
+
+timestampGeneratorGen3:
+  main:
+    portName: COM9
+    usbSerial: AQ03WVDD
+    timerFrequency: Timer1000Hz
+
+# The lick spout stage's two Harp StepperDriver boards. wiring: names what each motor and input
+# is connected to (Pip, 11 Nov 2026); the workflows still drive the axes by these motor numbers.
+# stepInterval, microstepResolution and maximumRunCurrent are the values av-dome writes.
+stepperDriver:
+  a:
+    portName: COM7
+    usbSerial: AQ03WRBO
+    stepInterval: 280
+    microstepResolution: Microstep8
+    maximumRunCurrent: 0.5
+    wiring:
+      Motor0: { device: BaseTransverse }
+      Motor1: { device: Radial, side: left }
+      Motor2: { device: Radial, side: right }
+      Input0: { device: BaseTransverseHome }
+      Input1: { device: RadialHome, side: left }
+      Input2: { device: RadialHome, side: right }
+  b:
+    portName: COM8
+    usbSerial: AQ03WRVU
+    stepInterval: 280
+    microstepResolution: Microstep8
+    maximumRunCurrent: 0.5
+    wiring:
+      Motor0: { device: Elevation, side: left }
+      Motor1: { device: Elevation, side: right }
+      Input0: { device: ElevationHome, side: left }
+      Input1: { device: ElevationHome, side: right }
+
+# Both Lickety Splits were unplugged at the 7 Nov scan: these usbSerials are what Windows last saw
+# on COM11 and COM12. Check them against the next scan.
+licketySplit:
+  left:
+    portName: COM11
+    usbSerial: E664C856C3592237
+    channel0TriggerThreshold: 0     # ADC counts above which a lick registers
+    channel0UntriggerThreshold: 0   # ADC counts below which the lick ends
+  right:
+    portName: COM12
+    usbSerial: E664C856C30B7F22
+    channel0TriggerThreshold: 0
+    channel0UntriggerThreshold: 0
+
+# From RigConfigs.cs, whose GreenDome1configs carries the same three (GREEN-DOME-1's own rig.yml has
+# others): check them against the cameras on this rig.
+camera:
+  face:
+    serialNumber: "23201540"
+    exposureTime: 19000    # microseconds
+    gain: 0
+    binning: 1
+    pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
+  pupil:
+    serialNumber: "23199185"
+    exposureTime: 19000    # microseconds
+    gain: 0
+    binning: 1
+    pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
+  body:
+    serialNumber: "25366329"
+    exposureTime: 19000    # microseconds
+    gain: 0
+    binning: 1
+    pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
+
+# Production's files, read only; copy them to calibration\ beside this file when the rig switches over.
+projectionCalibration:
+  meshMapPath: calibration/MeshMap.csv
+  gammaLutPath: calibration/gammalut.bmp
+
+speakerArray:
+  device:
+    deviceName: Speakers (XMOS xCORE-200 MC (UAC2.0))
+    hostApi: Windows WDM-KS
+    sampleRate: 48000       # Hz
+    channelCount: 32
+    suggestedLatency: 0.002 # s
+    bootDelaySeconds: 3.0   # s before the mixer starts: a fault while the sound card boots can blue-screen the PC
+  syncChannel: 31           # carries a copy of each stimulus for alignment with acquisition
+  syncGain: 0.2
+  penaltySoundChannel: 2      # the penalty sound's channel (the centre speaker)
+  unusedChannels: [30]      # not connected
+  backgroundNoise: ../shared/sounds/background_noise.wav   # the lab's one background noise (RigConfigs\shared, kept from the server's config\shared)
+  # Position is relative to the subject: azimuth 0 = straight ahead, positive to the right.
+  speakers:
+    left:
+      position: { azimuth: -90, elevation: 15 }
+      channel: 0
+      filter: calibration/speaker-left.json
+    right:
+      position: { azimuth: 90, elevation: 15 }
+      channel: 1
+      filter: calibration/speaker-right.json
+    centre:
+      position: { azimuth: 0, elevation: 15 }
+      channel: 2
+      filter: calibration/speaker-centre.json
+
+# Zapit is not hardware triggered: the trigger is the board's ZapitTrigger line in wiring.
+zapit:
+  host: 127.0.0.1
+  port: 1488
+  hardwareTriggered: false   # the trigger is the board's ZapitTrigger line in wiring
+
+# Default absolute stage position at session start (steps)
+lickSpoutDefaultPosition:
+  baseTransverse: 5900       # motor 1
+  leftRadial: 6040           # motor 2
+  rightRadial: 4610          # motor 3
+  leftElevation: 1500        # motor 4
+  rightElevation: 0          # motor 5
+
+# Every camera's video is encoded on the NVIDIA GPU (RTX 5060).
+videoEncoder:
+  codec: h264_nvenc

@@ -1,4 +1,4 @@
-"""The lab rig model on real rig.yml files (copied from K:\\config\\machines on 7 Nov 2026), the plan, and the judge."""
+"""The lab rig model on real rig.yml files (copied from K:\\config\\machines on 16 Nov 2026, every rig that has one), the plan, and the judge."""
 
 from pathlib import Path
 
@@ -13,22 +13,25 @@ THRESHOLDS = Path(__file__).parents[1] / "config" / "thresholds.yml"
 DOME = ["BehaviorBoard-Main", "TimestampGeneratorGen3-Main", "StepperDriver-A", "StepperDriver-B",
         "LicketySplit-Left", "LicketySplit-Right", "Camera-Face", "Camera-Pupil", "Camera-Body",
         "SpeakerArray", "ProjectionCalibration"]
+DOMES = ["GREEN-DOME-1", "GREEN-DOME-2", "BLUE-OPTO-1", "BLUE-OPTO-2"]
+BOXES = ["BBOX-1"]  # BBOX-2's still has CHANGE-ME for its board and camera
 
 
-@pytest.mark.parametrize("name", ["GREEN-DOME-1", "BLUE-OPTO-1", "BLUE-OPTO-2"])
+@pytest.mark.parametrize("name", DOMES)
 def test_a_dome_plans_every_device(name):
     assert [d.name for d in plan.plan(rig.load(FIXTURES / f"{name}.yml"))] == DOME
 
 
-@pytest.mark.parametrize("name", ["GREEN-DOME-1", "BLUE-OPTO-1", "BLUE-OPTO-2"])
-def test_a_dome_fixture_is_a_valid_lab_rig(name):
+@pytest.mark.parametrize("name", DOMES + BOXES)
+def test_a_fixture_is_a_valid_lab_rig(name):
     from open_rigs.rigs.lab_rig import LabRig
 
     LabRig.model_validate(yaml.safe_load((FIXTURES / f"{name}.yml").read_text(encoding="utf-8")))
 
 
-def test_a_box_plans_its_board_and_camera_only():
-    assert [d.name for d in plan.plan(rig.load(FIXTURES / "BBOX-1.yml"))] == ["BehaviorBoard-Main", "Camera-Overhead"]
+@pytest.mark.parametrize("name", BOXES)
+def test_a_box_plans_its_board_and_camera_only(name):
+    assert [d.name for d in plan.plan(rig.load(FIXTURES / f"{name}.yml"))] == ["BehaviorBoard-Main", "Camera-Overhead"]
 
 
 def test_absent_sections_are_fine(tmp_path):

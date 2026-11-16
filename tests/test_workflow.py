@@ -121,8 +121,7 @@ def test_pulse_and_reset_are_the_board_piece_s(wf):
     assert ET.tostring(hardware, encoding="unicode").count('Path="OpenRigs.Devices:BehaviorBoard.ManualPulses.bonsai"') == 1
 
 def test_the_dome_s_display_is_a_launch_property():
-    # DisplayDevice from the launch, mapped down to DomeHardware, as in the dome tasks and the projector calibration; it
-    # was fixed at First here (audit QF16, 16 Nov 2026).
+    # DisplayDevice from the launch, mapped down to DomeHardware, as in the dome tasks and the projector calibration.
     wf = lint.Workflow(ROOT, "dome.bonsai")
     nodes, edges = lint.nodes_and_edges(lint.child(wf.root, W + "Workflow"))
     (hardware,) = [i for i, n in enumerate(nodes) if n.findtext(W + "Name") == "Hardware"]

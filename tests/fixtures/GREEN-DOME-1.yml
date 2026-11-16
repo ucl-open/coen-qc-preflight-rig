@@ -1,22 +1,11 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/ucl-open/av-dome/pip/main-switchover/src/DataSchemas/ucl_open_av_dome.json
-# GREEN-DOME-1, from config\rig-template.yml (pip/main-switchover). Values from production's
-# RigConfigs.cs and main.bonsai (ActiveExperiments) and rig-setup's 4 Nov 2026 hardware scan.
-#
-# av-dome rig configuration TEMPLATE
-#
-# Per-rig configuration files are NOT committed to this repo. To deploy a rig:
-#   1. Copy this file to <ConfigRoot>\<MACHINE-NAME>\rig.yml, where ConfigRoot is
-#      C:\Coen-Lab-Local\RigConfigs (the lab's place, as coen-behaviour-box's, kept apart from
-#      production's C:\RigConfigs), e.g. C:\Coen-Lab-Local\RigConfigs\GREEN-DOME-2\rig.yml. The workflow resolves the
-#      directory by hostname and fails at startup if it or rig.yml is missing.
-#   2. Fill in the values for that rig. Calibration artefacts (valve curves and the like) go in
-#      calibration\ beside rig.yml and are referenced by paths relative to that directory.
-#   3. Off-repo copies should replace the $schema path above with an absolute path
-#      to a checked-out src/DataSchemas/ucl_open_av_dome.json (or a raw GitHub URL)
-#      to keep editor validation working.
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Coen-Lab/lib-open-rigs/main/src/open_rigs/schemas/lab_rig.json
+# GREEN-DOME-1, in the lab rig model (lib-open-rigs open_rigs.rigs.lab_rig, laid out as its rig-template.yml).
+# Values from production's RigConfigs.cs and main.bonsai (ActiveExperiments) and rig-setup's 4 Nov 2026
+# hardware scan. On the rig this file is C:\Coen-Lab-Local\RigConfigs\GREEN-DOME-1\rig.yml; calibration
+# artefacts (valve curves and the like) go in calibration\ beside it, referenced by paths relative to it.
 #
 rootPath: C:\Coen-Lab-Local\Acquired-Data
-rigId: D1                 # two capitals or a capital and a digit, such as D1: rig-control's session numbering
+rigId: G1                 # two capitals or a capital and a digit: rig-control's session numbering (G for green; D1 until 14 Nov 2026)
 
 # Each kind of device is a group of named entries: behaviorBoard: main: is BehaviorBoard-Main in the
 # data and in live view. The workflow takes each device it drives by that name and stops at startup,
@@ -29,20 +18,20 @@ behaviorBoard:
     portName: COM6
     usbSerial: BG01WA0E
     pulseController:
-      outputPulseEnable: "DO1, DO2"
-      # Each reward valve is a CalibratedPulse: its curve, in calibration\ beside this file, plans every
-      # reward's pulses at the gap it was calibrated at. The ZapitTrigger line (DO3) is held high, never pulsed:
-      # the board model needs a DO3 entry, so it is the dome template's 0 ms FixedPulse.
+      outputPulseEnable: "DO1, DO2"   # never DO3: the ZapitTrigger line is held until the workflow clears it
+      # Each line is a FixedPulse (width set here) or a CalibratedPulse (width looked up per reward
+      # on a valve calibration curve in calibration\). A fixed reward line delivers ceil(ul / 2)
+      # pulses of its width, assuming 2 ul per pulse; a calibrated one delivers the requested volume.
       outputs:
-        DO1: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json }
-        DO2: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO2.json }
-        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }
-    # What each line drives (lab rig model, open_rigs.rigs.lab_rig): one RewardValve per side and one ZapitTrigger.
+        DO1: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json }   # left reward valve (was a fixed 50 ms)
+        DO2: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO2.json }   # right reward valve (was a fixed 45 ms)
+        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }   # ZapitTrigger line: held, not pulsed, so no width
+    # What each line drives (lab rig model): one RewardValve per spout, named left and right, and the ZapitTrigger.
     wiring:
       DO0: { device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }
       DO1: { device: RewardValve, name: left }
       DO2: { device: RewardValve, name: right }
-      DO3: { device: ZapitTrigger, note: also the masking light }
+      DO3: { device: ZapitTrigger }
     cameraTriggerController:
       trigger0Enabled: true     # camera trigger 0 shares the DO0 pin
       trigger0Frequency: 50     # Hz
@@ -58,16 +47,34 @@ timestampGeneratorGen3:
     usbSerial: AQ03WH45
     timerFrequency: Timer1000Hz
 
-# The lick spout stage's two Harp StepperDriver boards. The workflow drives the axes by motor
-# number, fixed: board a motor 0 base transverse (1), motor 1 left radial (2), motor 2 right
-# radial (3); board b motor 0 left elevation (4), motor 1 right elevation (5).
+# The lick spout stage's two Harp StepperDriver boards. wiring: names what each motor and input
+# is connected to (Pip, 11 Nov 2026); the workflows still drive the axes by these motor numbers.
+# stepInterval, microstepResolution and maximumRunCurrent are the values av-dome writes.
 stepperDriver:
   a:
-    portName: COM4        # motors 1, 2, 3
+    portName: COM4
     usbSerial: AQ03WRBG
+    stepInterval: 280
+    microstepResolution: Microstep8
+    maximumRunCurrent: 0.5
+    wiring:
+      Motor0: { device: BaseTransverse }
+      Motor1: { device: Radial, side: left }
+      Motor2: { device: Radial, side: right }
+      Input0: { device: BaseTransverseHome }
+      Input1: { device: RadialHome, side: left }
+      Input2: { device: RadialHome, side: right }
   b:
-    portName: COM5        # motors 4, 5
+    portName: COM5
     usbSerial: AQ03WW0D
+    stepInterval: 280
+    microstepResolution: Microstep8
+    maximumRunCurrent: 0.5
+    wiring:
+      Motor0: { device: Elevation, side: left }
+      Motor1: { device: Elevation, side: right }
+      Input0: { device: ElevationHome, side: left }
+      Input1: { device: ElevationHome, side: right }
 
 licketySplit:
   left:
@@ -87,16 +94,19 @@ camera:
     exposureTime: 19000    # microseconds
     gain: 0
     binning: 1
+    pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
   pupil:
     serialNumber: "23201536"
     exposureTime: 19000    # microseconds
     gain: 0
     binning: 1
+    pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
   body:
     serialNumber: "23199184"
     exposureTime: 19000    # microseconds
     gain: 0
     binning: 1
+    pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
 
 projectionCalibration:
   meshMapPath: calibration/MeshMap.csv
@@ -109,15 +119,16 @@ speakerArray:
     sampleRate: 48000       # Hz
     channelCount: 32
     suggestedLatency: 0.002 # s
-    bootDelaySeconds: 3.0   # s; guards a driver fault if the workflow stops during mixer init
+    bootDelaySeconds: 3.0   # s before the mixer starts: a fault while the sound card boots can blue-screen the PC
   syncChannel: 31           # carries a copy of each stimulus for alignment with acquisition
   syncGain: 0.2
-  penaltySoundChannel: 2    # the penalty sound's channel
+  penaltySoundChannel: 2    # the penalty sound's channel (the centre speaker, as GREEN-DOME-2's)
   unusedChannels: [30]      # not connected
+  backgroundNoise: ../shared/sounds/background_noise.wav   # the lab's one background noise (RigConfigs\shared, kept from the server's config\shared)
   # Speakers currently wired on this rig. Position is relative to the subject:
   # azimuth 0 = straight ahead, positive to the right; elevation 0 = horizontal.
   # filter: the speaker's SpeakerFilter artefact (FIR taps), relative to this directory. The
-  # auditory stimuli are calibration\AuditoryStimuli\filtered_pink_pulse_train_0..99.wav.
+  # auditory stimuli are src\LocalFiles\AuditoryStimuli\filtered_pink_pulse_train_0..99.wav.
   speakers:
     left:
       position: { azimuth: -90, elevation: 15 }
@@ -160,16 +171,20 @@ speakerArray:
   #   layer4_-90:    { position: { azimuth: -90,    elevation: -15 }, channel: 24 }
   #   layer4_-120:   { position: { azimuth: -120,   elevation: -15 }, channel: 25 }
 
-# Zapit optogenetics server (tcpServer section of the Zapit settings file). Only contacted
-# when the task YAML sets optogenetics.enabled: true, so non-opto rigs can leave the defaults.
+# Zapit optogenetics server (tcpServer section of the Zapit settings file). Contacted only when the
+# task sets optogenetics.useZapit: true, so non-opto rigs can leave the defaults.
 zapit:
   host: 127.0.0.1         # PC running Zapit; 127.0.0.1 when Zapit runs on this rig PC
   port: 1488
-  hardwareTriggered: false  # true once the ZapitTrigger line is cabled to the Zapit DAQ trigger input
+  hardwareTriggered: false  # true once wiring's ZapitTrigger line is cabled to the Zapit DAQ trigger input
 # Default absolute stage position at session start (steps)
-lickSpoutDefaultPosition:
-  baseTransverse: 0       # motor 1
-  leftRadial: 0           # motor 2
-  rightRadial: 0          # motor 3
-  leftElevation: 0        # motor 4
-  rightElevation: 0       # motor 5
+lickSpoutDefaultPosition:   # mean of the two-spout mice on this rig, 16 Nov 2026
+  baseTransverse: 6150       # motor 1
+  leftRadial: 10100           # motor 2
+  rightRadial: 10300          # motor 3
+  leftElevation: 10900        # motor 4
+  rightElevation: 13400       # motor 5
+
+# Every camera's video is encoded on the NVIDIA GPU (RTX 5060).
+videoEncoder:
+  codec: h264_nvenc

@@ -2,9 +2,7 @@
 
 from dataclasses import dataclass
 
-from open_rigs.rigs.lab_rig import LabRig
-
-from coen_qc_preflight_rig.rig import DEVICE_KINDS, SINGLE_SECTIONS
+from open_rigs.rigs.lab_rig import PREFLIGHT_DEVICE_KINDS, PREFLIGHT_SINGLE_SECTIONS, LabRig
 
 # rig.yml key to LabRig attribute.
 _FIELDS = {
@@ -33,6 +31,6 @@ class Planned:
 
 def plan(rig: LabRig) -> list[Planned]:
     """Every device and single section the rig declares, in check order."""
-    out = [Planned(kind, name, entry) for kind in DEVICE_KINDS for name, entry in getattr(rig, _FIELDS[kind]).items()]
-    out += [Planned(kind, "", getattr(rig, _FIELDS[kind])) for kind in SINGLE_SECTIONS if getattr(rig, _FIELDS[kind])]
+    out = [Planned(kind, name, entry) for kind in PREFLIGHT_DEVICE_KINDS for name, entry in getattr(rig, _FIELDS[kind]).items()]
+    out += [Planned(kind, "", getattr(rig, _FIELDS[kind])) for kind in PREFLIGHT_SINGLE_SECTIONS if getattr(rig, _FIELDS[kind])]
     return out

@@ -10,12 +10,6 @@ from pathlib import Path
 import yaml
 from open_rigs.rigs.lab_rig import LabRig
 
-# The keyed sections, in the order the check runs them, by their rig.yml key.
-DEVICE_KINDS = ("behaviorBoard", "timestampGeneratorGen3", "stepperDriver", "licketySplit", "camera")
-# The single sections that turn a check on when present.
-SINGLE_SECTIONS = ("speakerArray", "projectionCalibration")
-
-
 def load(path: Path) -> LabRig:
     """The rig.yml at path; raises pydantic's ValidationError naming the key when a declared device is wrong."""
     data = yaml.safe_load(Path(path).read_text(encoding="utf-8-sig")) or {}

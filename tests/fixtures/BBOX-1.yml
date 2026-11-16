@@ -1,8 +1,7 @@
-# yaml-language-server: $schema=C:/Github/Coen-Lab/coen-behaviour-box/src/DataSchemas/ucl_open_coen_behaviour_box.json#/$defs/LabRig
-# Rig configuration. Each device sits under its kind by name: the workflow drives behaviorBoard: main:
-# (BehaviorBoard-Main in the data) and camera: overhead: (Camera-Overhead), and stops at startup if either
-# is missing. The frame rate is behaviorBoard.main.cameraTriggerController.trigger0Frequency;
-# camera.overhead.triggerFrequency and trigger1Frequency are not used by this rig.
+# The lab rig model (lib-open-rigs open_rigs.rigs.lab_rig LabRig). Each device sits under its kind by name: the
+# box drives behaviorBoard: main: (BehaviorBoard-Main in the data) and camera: overhead: (Camera-Overhead), and
+# stops at startup if either is missing. The camera's trigger and frame rate are the board's camera trigger its
+# wiring line names it on (DO0, trigger0Frequency).
 behaviorBoard:
   main:
     cameraTriggerController:
@@ -22,7 +21,11 @@ camera:
     discriminatorType: SpinnakerCamera
     exposureTime: 3000.0
     gain: 1.0
-    pixelFormat: Mono8
     serialNumber: '23201539'
-rigId: S1
+    pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
+rigId: S1  # S for behaviour box; B1 until 14 Nov 2026
 rootPath: C:\Coen-Lab-Local\Acquired-Data
+
+# Every camera's video is encoded on the Intel GPU (Quick Sync).
+videoEncoder:
+  codec: h264_qsv
