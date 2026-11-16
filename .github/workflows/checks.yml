@@ -45,8 +45,8 @@ jobs:
           # The lab's packages come from local_packages, as Setup.ps1 restores them (.bonsai\NuGet.config).
           dotnet build src/Extensions.csproj -p:LangVersion=5 -o "$env:RUNNER_TEMP/extensions" --source https://api.nuget.org/v3/index.json --source "$PWD/local_packages"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-      - name: main.bonsai parses
+      - name: Each workflow parses
         shell: pwsh
         run: |
-          uv run --no-project python -c "import xml.etree.ElementTree as ET; ET.parse('src/main.bonsai'); print('src/main.bonsai parses')"
+          uv run --no-project python -c "import xml.etree.ElementTree as ET; [print(ET.parse(f) and f, 'parses') for f in ('src/main.bonsai', 'src/box.bonsai')]"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }

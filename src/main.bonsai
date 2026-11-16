@@ -1,32 +1,26 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <WorkflowBuilder Version="2.9.0"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:p1="clr-namespace:;assembly=Extensions"
-                 xmlns:harp="clr-namespace:Bonsai.Harp;assembly=Bonsai.Harp"
-                 xmlns:spk="clr-namespace:Bonsai.Spinnaker;assembly=Bonsai.Spinnaker"
-                 xmlns:vid="clr-namespace:OpenRigs.Video;assembly=OpenRigs.Video"
                  xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
-                 xmlns:io="clr-namespace:Bonsai.IO;assembly=Bonsai.System"
-                 xmlns:orc="clr-namespace:OpenRigs.Core;assembly=OpenRigs.Core"
-                 xmlns:orl="clr-namespace:OpenRigs.Logging;assembly=OpenRigs.Logging"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
                  xmlns:aud="clr-namespace:OpenRigs.Audio;assembly=OpenRigs.Audio"
                  xmlns:dsp="clr-namespace:Bonsai.Dsp;assembly=Bonsai.Dsp"
                  xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
-                 xmlns:sys="clr-namespace:System;assembly=mscorlib"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The pre-training preflight (PROTOTYPE), run from rig-control's Preflight card. Ready mode: every device this machine's rig.yml declares is opened and kept open until Stop, its rate reported once a second as the devices metric; a behaviour board with trigger 0 enabled triggers the cameras (OpenRigs.Video TriggeredSpinnaker with rig.yml's exposure, gain, binning and pixelFormat, Mono8 when not set) at its frequency; the Pulse command pulses a behaviour board line. Go counts each device in turn (step metric), asks the person about each device that needs it (prompt metric, answered by Confirm; each rig.yml speaker plays a test sound while its question is asked, SpeakerTest, and the sounds the mixer is sent are counted for each speaker: the devices metric's SpeakerArray sounds n and the raw rows SpeakerArray,sounds:&lt;speaker&gt;,n), writes the raw rows (device,measure,value,detail) to RawFile and reports Finished. coen_qc_preflight_rig.judge applies the thresholds.</Description>
+  <Description>The domes' preflight, run from rig-control's Preflight page and card as the test mouse: the domes' rig list (OpenRigs.Devices DomeHardware) opens and readies every device as a task does, no experiment folder (NoExperimentFolder), and the lab's check (OpenRigs.Devices PreflightChecks) counts each rig.yml device from its piece's data (Taps) and, from Go, writes the raw rows to RawFile with the questions of TaskPath (config\task-dome.yml). A device that fails as it opens stops the preflight naming it, as it stops a task. Commands Pulse and Reset on BehaviorBoard-Main, Move and Home on the lick spout stage's drivers, written into the pieces' own command subjects (Commands). Each rig.yml speaker plays a test sound while its question is asked (SpeakerTest), and the projector shows a test pattern (TestPattern). coen_qc_preflight_rig.judge applies the thresholds.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="ConfigRoot" Description="The folder holding &lt;MACHINE&gt;\rig.yml; a launch property." />
-        <Property Name="ProjectionWindowState" Description="Fullscreen on a rig; Normal for a test on a desk." />
-        <Property Name="ProjectionWidth" />
-        <Property Name="ProjectionHeight" />
       </Expression>
-      <Expression xsi:type="ExternalizedMapping">
-        <Property Name="RawFile" Description="Where the raw rows go; a launch property." />
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
+        <ConfigRoot>C:\Coen-Lab-Local\RigConfigs</ConfigRoot>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:NoExperimentFolder.bonsai">
+        <SubjectId>_preflight_</SubjectId>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="SubjectId" />
@@ -34,7 +28,7 @@
       </Expression>
       <Expression xsi:type="GroupWorkflow">
         <Name>Initialization</Name>
-        <Description>The experiment controller (OpenRigs.Control, ExperimentControl, TCP 5561 on this machine): commands Pulse, Reset, Move, Home and Confirm; Recording at Go.</Description>
+        <Description>The experiment controller (OpenRigs.Control, ExperimentControl, TCP 5561 on this machine): commands Pulse, Reset, Move and Home (Confirm is PreflightChecks'). EndAfterStop ends headless Bonsai when it is still running 2 s after the controller's stop.</Description>
         <Workflow>
           <Nodes>
             <Expression xsi:type="ExternalizedMapping">
@@ -49,33 +43,21 @@
               <Commands>
                 <Command>
                   <Name>Pulse</Name>
-                  <Description>One pulse on a behaviour board line: the text is the board and line, such as BehaviorBoard-Main DO1. Its length is the line's pulseWidthMs in rig.yml, else 50 ms, or a width in ms given third, 1 to 60000 (BehaviorBoard-Main DO1 10000: rig-control's Flush, a valve open 10 s). On DO0 to DO3 the board times it, so it ends even if the workflow stops.</Description>
+                  <Description>One pulse on a behaviour board line: the text is the board and line, such as BehaviorBoard-Main DO1. Its length is the line's pulseWidthMs in rig.yml, else 50 ms, or a width in ms given third, 1 to 60000 (BehaviorBoard-Main DO1 10000: rig-control's Flush, a valve open 10 s). On DO1 to DO3 the board times it, so it ends even if the workflow stops. Never on a CameraTrigger or ZapitTrigger line.</Description>
                 </Command>
                 <Command>
                   <Name>Reset</Name>
-                  <Description>Every behaviour board put back as an experiment expects it: each DO line closed now (a Flush too; DO0 left to the camera trigger when it runs), each line's PulseDO width and OutputPulseEnable as rig.yml has them. The text is empty for every board, or a board's name. rig-control's End Testing sends it before the stop.</Description>
+                  <Description>The behaviour board put back as an experiment expects it: each DO line not a camera trigger closed now (a Flush too), each fixed line's PulseDO width and the pulsed lines as rig.yml has them. The text is empty, or the board's name. rig-control's End Testing sends it before the stop.</Description>
                 </Command>
                 <Command>
                   <Name>Move</Name>
-                  <Description>Steps on a stepper driver motor its rig.yml wiring names, from where it is: the text is the driver, motor and steps, such as StepperDriver-A Motor1 -150.</Description>
+                  <Description>Steps on a stepper driver motor its rig.yml wiring names, from where it is: the text is the driver, motor and steps, such as StepperDriver-A Motor1 -150, or the driver, motor, to and a position, such as StepperDriver-A Motor1 to 5900.</Description>
                 </Command>
                 <Command>
                   <Name>Home</Name>
-                  <Description>Zeroes a stepper driver motor as the lab's dome workflows do: off its home switch if on it, then towards zero until the switch stops it, then its position set to 0. The text is the driver and motor, such as StepperDriver-A Motor1; only a motor whose motor and input rig.yml's wiring names.</Description>
-                </Command>
-                <Command>
-                  <Name>Confirm</Name>
-                  <Description>The person's answer for a device the check asks about, after Go: the text is the device and yes or no, such as SpeakerArray yes.</Description>
+                  <Description>Zeroes a stepper driver motor as the lick spout stage does: off its home switch if on it, then towards zero until the switch stops it, then its position set to 0. The text is the driver and motor, such as StepperDriver-A Motor1; only a motor whose motor and input rig.yml's wiring names.</Description>
                 </Command>
               </Commands>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>ExperimentGo</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="orcl:ReportPhase">
-                <orcl:Phase>Recording</orcl:Phase>
-              </Combinator>
             </Expression>
             <Expression xsi:type="Combinator">
               <Description>Ends headless Bonsai when it is still running 2 s after the controller's stop: the live view's publisher threads keep the process alive until every device's teardown reaches them, and one held up kept Bonsai running until the agent's kill 30 s after End Testing (GREEN-DOME-2, 15 Nov 2026). Nothing in the editor.</Description>
@@ -86,424 +68,312 @@
           </Nodes>
           <Edges>
             <Edge From="0" To="1" Label="Source1" />
-            <Edge From="2" To="3" Label="Source1" />
           </Edges>
         </Workflow>
       </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:DomeHardware.bonsai">
+        <DisplayDevice>First</DisplayDevice>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="RawFile" Description="Where the raw rows go; a launch property." />
+        <Property Name="TaskPath" Description="The task file app-rig-control writes at Go: config\task-dome.yml with the form's edits." />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:PreflightChecks.bonsai">
+        <RawFile>preflight-raw.csv</RawFile>
+        <TaskPath>..\config\task-dome.yml</TaskPath>
+      </Expression>
       <Expression xsi:type="GroupWorkflow">
-        <Name>Devices</Name>
-        <Description>Devices lists every entry the check covers, kind by kind, from &lt;ConfigRoot&gt;\&lt;MACHINE&gt;\rig.yml, read into the lab rig model as every lab workflow reads it (OpenRigs.Devices ReadLabRig). Each SelectMany opens one branch per entry of its family and keeps the device open until Stop; DeviceMonitor reports what each sent every second, or its error, as DeviceReports.</Description>
+        <Name>Taps</Name>
+        <Description>Each device piece's data, and the projector's frames (DrawStimuli), as the check's ticks (OpenRigs.Devices PreflightTap into DeviceTicks), by the device's rig.yml name.</Description>
         <Workflow>
           <Nodes>
-            <Expression xsi:type="ExternalizedMapping">
-              <Property Name="ConfigRoot" />
-            </Expression>
-            <Expression xsi:type="ExternalizedMapping">
-              <Property Name="WindowState" DisplayName="ProjectionWindowState" />
-              <Property Name="Width" DisplayName="ProjectionWidth" />
-              <Property Name="Height" DisplayName="ProjectionHeight" />
+            <Expression xsi:type="SubscribeSubject">
+              <Name>TimestampGeneratorGen3-Main.Data</Name>
             </Expression>
             <Expression xsi:type="Combinator">
-              <Combinator xsi:type="p1:PreflightDevices">
-                <p1:Kinds>behaviorBoard,timestampGeneratorGen3,stepperDriver,licketySplit,camera,speakerArray,projectionCalibration</p1:Kinds>
+              <Combinator xsi:type="dev:PreflightTap">
+                <dev:Device>TimestampGeneratorGen3-Main</dev:Device>
               </Combinator>
             </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="rx:ToArray" />
+            <Expression xsi:type="MulticastSubject">
+              <Name>DeviceTicks</Name>
             </Expression>
-            <Expression xsi:type="rx:AsyncSubject">
-              <Name>Devices</Name>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>BehaviorBoard-Main.Data</Name>
             </Expression>
             <Expression xsi:type="Combinator">
-              <Combinator xsi:type="p1:PreflightDevices">
-                <p1:Kinds>behaviorBoard,timestampGeneratorGen3,stepperDriver,licketySplit</p1:Kinds>
+              <Combinator xsi:type="dev:PreflightTap">
+                <dev:Device>BehaviorBoard-Main</dev:Device>
               </Combinator>
             </Expression>
-            <Expression xsi:type="rx:SelectMany">
-              <Name>Harp Boards</Name>
-              <Workflow>
-                <Nodes>
-                  <Expression xsi:type="WorkflowInput">
-                    <Name>Source1</Name>
-                  </Expression>
-                  <Expression xsi:type="rx:AsyncSubject">
-                    <Name>HarpEntry</Name>
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>ControlEvents</Name>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="orcl:OnCommand">
-                      <orcl:Name>Pulse</orcl:Name>
-                    </Combinator>
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>HarpEntry</Name>
-                  </Expression>
-                  <Expression xsi:type="PropertyMapping">
-                    <PropertyMappings>
-                      <Property Name="Device" Selector="Name" />
-                      <Property Name="Kind" Selector="Kind" />
-                      <Property Name="PulseWidths" Selector="PulseWidths" />
-                      <Property Name="OutputPulseEnable" Selector="OutputPulseEnable" />
-                      <Property Name="Trigger0Frequency" Selector="Trigger0Frequency" />
-                      <Property Name="RunningWheel" Selector="RunningWheel" />
-                      <Property Name="WiredMotors" Selector="WiredMotors" />
-                      <Property Name="WiredInputs" Selector="WiredInputs" />
-                      <Property Name="StepInterval" Selector="StepInterval" />
-                      <Property Name="MicrostepResolution" Selector="MicrostepResolution" />
-                      <Property Name="MaximumRunCurrent" Selector="MaximumRunCurrent" />
-                    </PropertyMappings>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="p1:BoardWrites" />
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>HarpEntry</Name>
-                  </Expression>
-                  <Expression xsi:type="PropertyMapping">
-                    <PropertyMappings>
-                      <Property Name="PortName" Selector="PortName" />
-                    </PropertyMappings>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="harp:Device">
-                      <harp:OperationMode>Active</harp:OperationMode>
-                      <harp:OperationLed>On</harp:OperationLed>
-                      <harp:DumpRegisters>true</harp:DumpRegisters>
-                      <harp:VisualIndicators>On</harp:VisualIndicators>
-                      <harp:Heartbeat>Enabled</harp:Heartbeat>
-                      <harp:IgnoreErrors>false</harp:IgnoreErrors>
-                      <harp:PortName />
-                    </Combinator>
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>HarpEntry</Name>
-                  </Expression>
-                  <Expression xsi:type="PropertyMapping">
-                    <PropertyMappings>
-                      <Property Name="Device" Selector="Name" />
-                    </PropertyMappings>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="p1:DeviceMonitor">
-                      <p1:Measure>messages</p1:Measure>
-                      <p1:OpenSeconds>5</p1:OpenSeconds>
-                    </Combinator>
-                  </Expression>
-                  <Expression xsi:type="WorkflowOutput" />
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="p1:RetryPortOpen">
-                      <p1:Attempts>4</p1:Attempts>
-                      <p1:DelaySeconds>0.5</p1:DelaySeconds>
-                    </Combinator>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="p1:ShareDeviceData" />
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>ControlEvents</Name>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="orcl:OnCommand">
-                      <orcl:Name>Move</orcl:Name>
-                    </Combinator>
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>ControlEvents</Name>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="orcl:OnCommand">
-                      <orcl:Name>Home</orcl:Name>
-                    </Combinator>
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>ControlEvents</Name>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="orcl:OnCommand">
-                      <orcl:Name>Reset</orcl:Name>
-                    </Combinator>
-                  </Expression>
-                </Nodes>
-                <Edges>
-                  <Edge From="0" To="1" Label="Source1" />
-                  <Edge From="20" To="21" Label="Source1" />
-                  <Edge From="21" To="6" Label="Source5" />
-                  <Edge From="2" To="3" Label="Source1" />
-                  <Edge From="3" To="6" Label="Source1" />
-                  <Edge From="16" To="17" Label="Source1" />
-                  <Edge From="17" To="6" Label="Source3" />
-                  <Edge From="18" To="19" Label="Source1" />
-                  <Edge From="19" To="6" Label="Source4" />
-                  <Edge From="4" To="5" Label="Source1" />
-                  <Edge From="5" To="6" Label="Source2" />
-                  <Edge From="6" To="9" Label="Source1" />
-                  <Edge From="7" To="8" Label="Source1" />
-                  <Edge From="8" To="9" Label="Source2" />
-                  <Edge From="9" To="14" Label="Source1" />
-                  <Edge From="14" To="15" Label="Source1" />
-                  <Edge From="15" To="12" Label="Source1" />
-                  <Edge From="11" To="14" Label="Source2" />
-                  <Edge From="11" To="15" Label="Source2" />
-                  <Edge From="10" To="11" Label="Source1" />
-                  <Edge From="11" To="12" Label="Source2" />
-                  <Edge From="12" To="13" Label="Source1" />
-                </Edges>
-              </Workflow>
+            <Expression xsi:type="MulticastSubject">
+              <Name>DeviceTicks</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>LicketySplit-Left.Data</Name>
             </Expression>
             <Expression xsi:type="Combinator">
-              <Combinator xsi:type="p1:PreflightDevices">
-                <p1:Kinds>camera</p1:Kinds>
+              <Combinator xsi:type="dev:PreflightTap">
+                <dev:Device>LicketySplit-Left</dev:Device>
               </Combinator>
             </Expression>
-            <Expression xsi:type="rx:SelectMany">
-              <Name>Cameras</Name>
-              <Workflow>
-                <Nodes>
-                  <Expression xsi:type="WorkflowInput">
-                    <Name>Source1</Name>
-                  </Expression>
-                  <Expression xsi:type="rx:AsyncSubject">
-                    <Name>CameraEntry</Name>
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>CameraEntry</Name>
-                  </Expression>
-                  <Expression xsi:type="PropertyMapping">
-                    <PropertyMappings>
-                      <Property Name="SerialNumber" Selector="SerialNumber" />
-                      <Property Name="ExposureTime" Selector="ExposureTime" />
-                      <Property Name="Gain" Selector="Gain" />
-                      <Property Name="Binning" Selector="Binning" />
-                      <Property Name="PixelFormat" Selector="PixelFormat" />
-                    </PropertyMappings>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="vid:TriggeredSpinnaker">
-                      <spk:Index xsi:nil="true" />
-                      <spk:SerialNumber />
-                      <spk:ColorProcessing>Default</spk:ColorProcessing>
-                      <vid:ExposureTime>19000</vid:ExposureTime>
-                      <vid:Gain>0</vid:Gain>
-                      <vid:Binning>1</vid:Binning>
-                      <vid:PixelFormat>Mono8</vid:PixelFormat>
-                    </Combinator>
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>CameraEntry</Name>
-                  </Expression>
-                  <Expression xsi:type="PropertyMapping">
-                    <PropertyMappings>
-                      <Property Name="Device" Selector="Name" />
-                    </PropertyMappings>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="p1:DeviceMonitor">
-                      <p1:Measure>frames</p1:Measure>
-                      <p1:OpenSeconds>5</p1:OpenSeconds>
-                    </Combinator>
-                  </Expression>
-                  <Expression xsi:type="WorkflowOutput" />
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="p1:ShareDeviceData" />
-                  </Expression>
-                </Nodes>
-                <Edges>
-                  <Edge From="0" To="1" Label="Source1" />
-                  <Edge From="2" To="3" Label="Source1" />
-                  <Edge From="3" To="4" Label="Source1" />
-                  <Edge From="4" To="9" Label="Source1" />
-                  <Edge From="9" To="7" Label="Source1" />
-                  <Edge From="5" To="6" Label="Source1" />
-                  <Edge From="6" To="7" Label="Source2" />
-                  <Edge From="6" To="9" Label="Source2" />
-                  <Edge From="7" To="8" Label="Source1" />
-                </Edges>
-              </Workflow>
+            <Expression xsi:type="MulticastSubject">
+              <Name>DeviceTicks</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>LicketySplit-Right.Data</Name>
             </Expression>
             <Expression xsi:type="Combinator">
-              <Combinator xsi:type="p1:PreflightDevices">
-                <p1:Kinds>projectionCalibration</p1:Kinds>
+              <Combinator xsi:type="dev:PreflightTap">
+                <dev:Device>LicketySplit-Right</dev:Device>
               </Combinator>
             </Expression>
-            <Expression xsi:type="rx:SelectMany">
-              <Name>Projection</Name>
-              <Description>Only for a rig whose rig.yml has projectionCalibration: opens the projector's window with the rig's mesh map and gamma lookup and a test pattern, counts the frames rendered, and closes once the person has answered its Confirm after Go.</Description>
-              <Workflow>
-                <Nodes>
-                  <Expression xsi:type="WorkflowInput">
-                    <Name>Source1</Name>
-                  </Expression>
-                  <Expression xsi:type="rx:AsyncSubject">
-                    <Name>ProjectionEntry</Name>
-                  </Expression>
-                  <Expression xsi:type="ExternalizedMapping">
-                    <Property Name="WindowState" />
-                    <Property Name="Width" />
-                    <Property Name="Height" />
-                  </Expression>
-                  <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Vision:ProjectorDisplay.bonsai">
-                    <DisplayDevice>First</DisplayDevice>
-                    <WindowState>Fullscreen</WindowState>
-                    <Width>1920</Width>
-                    <Height>1080</Height>
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>ProjectionEntry</Name>
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>DrawStimuli</Name>
-                  </Expression>
-                  <Expression xsi:type="IncludeWorkflow" Path="BonVision:Primitives.DrawQuad.bonsai">
-                    <ExtentX>120</ExtentX>
-                    <ExtentY>60</ExtentY>
-                    <LocationX>0</LocationX>
-                    <LocationY>30</LocationY>
-                    <Layer>0</Layer>
-                    <Angle>0</Angle>
-                    <ColorR>1</ColorR>
-                    <ColorG>1</ColorG>
-                    <ColorB>1</ColorB>
-                    <ColorA>1</ColorA>
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>ProjectionEntry</Name>
-                  </Expression>
-                  <Expression xsi:type="PropertyMapping">
-                    <PropertyMappings>
-                      <Property Name="Device" Selector="Name" />
-                    </PropertyMappings>
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>ControlEvents</Name>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="orcl:OnCommand">
-                      <orcl:Name>Confirm</orcl:Name>
-                    </Combinator>
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>ExperimentGo</Name>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="p1:Answered" />
-                  </Expression>
-                  <Expression xsi:type="rx:PublishSubject">
-                    <Name>ProjectionClose</Name>
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>ProjectionClose</Name>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="p1:CloseWhen" />
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>ProjectionEntry</Name>
-                  </Expression>
-                  <Expression xsi:type="PropertyMapping">
-                    <PropertyMappings>
-                      <Property Name="Device" Selector="Name" />
-                    </PropertyMappings>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="p1:DeviceMonitor">
-                      <p1:Measure>frames</p1:Measure>
-                      <p1:OpenSeconds>5</p1:OpenSeconds>
-                    </Combinator>
-                  </Expression>
-                  <Expression xsi:type="WorkflowOutput" />
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>ProjectionClose</Name>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="rx:Delay">
-                      <rx:DueTime>PT1S</rx:DueTime>
-                    </Combinator>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="rx:TakeUntil" />
-                  </Expression>
-                  <Expression xsi:type="Annotation">
-                    <Name>Why CloseWhen, then TakeUntil</Name>
-                    <Text><![CDATA[The window is kept until the person's Confirm for it after Go. CloseWhen then ends ProjectorDisplay at its next frame, on the GL thread, and ProjectorDisplay frees BonVision's GL resources on its render thread (DisposeOnRenderThread), as it does at a Stop from the control server's thread. The test pattern's draw branch is taken until 1 s later, once the window has gone.]]></Text>
-                  </Expression>
-                </Nodes>
-                <Edges>
-                  <Edge From="0" To="1" Label="Source1" />
-                  <Edge From="5" To="6" Label="Source1" />
-                  <Edge From="6" To="22" Label="Source1" />
-                  <Edge From="7" To="8" Label="Source1" />
-                  <Edge From="8" To="12" Label="Source3" />
-                  <Edge From="9" To="10" Label="Source1" />
-                  <Edge From="10" To="12" Label="Source1" />
-                  <Edge From="11" To="12" Label="Source2" />
-                  <Edge From="12" To="13" Label="Source1" />
-                  <Edge From="14" To="15" Label="Source2" />
-                  <Edge From="15" To="18" Label="Source1" />
-                  <Edge From="16" To="17" Label="Source1" />
-                  <Edge From="17" To="18" Label="Source2" />
-                  <Edge From="18" To="19" Label="Source1" />
-                  <Edge From="20" To="21" Label="Source1" />
-                  <Edge From="21" To="22" Label="Source2" />
-                  <Edge From="4" To="3" Label="Source1" />
-                  <Edge From="2" To="3" Label="Source2" />
-                  <Edge From="3" To="15" Label="Source1" />
-                </Edges>
-              </Workflow>
+            <Expression xsi:type="MulticastSubject">
+              <Name>DeviceTicks</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>StepperDriver-A.Data</Name>
             </Expression>
             <Expression xsi:type="Combinator">
-              <Combinator xsi:type="rx:Merge" />
+              <Combinator xsi:type="dev:PreflightTap">
+                <dev:Device>StepperDriver-A</dev:Device>
+              </Combinator>
             </Expression>
-            <Expression xsi:type="rx:PublishSubject">
-              <Name>DeviceReports</Name>
+            <Expression xsi:type="MulticastSubject">
+              <Name>DeviceTicks</Name>
             </Expression>
-            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
-              <ConfigRoot>C:\Coen-Lab-Local\RigConfigs</ConfigRoot>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>StepperDriver-B.Data</Name>
             </Expression>
-            <Expression xsi:type="rx:ReplaySubject" TypeArguments="p1:SpeakerSounds">
-              <rx:Name>SpeakerSounds</rx:Name>
-              <rx:BufferSize>1</rx:BufferSize>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="dev:PreflightTap">
+                <dev:Device>StepperDriver-B</dev:Device>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="MulticastSubject">
+              <Name>DeviceTicks</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>Camera-Face.Data</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="dev:PreflightTap">
+                <dev:Device>Camera-Face</dev:Device>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="MulticastSubject">
+              <Name>DeviceTicks</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>Camera-Pupil.Data</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="dev:PreflightTap">
+                <dev:Device>Camera-Pupil</dev:Device>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="MulticastSubject">
+              <Name>DeviceTicks</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>Camera-Body.Data</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="dev:PreflightTap">
+                <dev:Device>Camera-Body</dev:Device>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="MulticastSubject">
+              <Name>DeviceTicks</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>DrawStimuli</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="dev:PreflightTap">
+                <dev:Device>ProjectionCalibration</dev:Device>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="MulticastSubject">
+              <Name>DeviceTicks</Name>
             </Expression>
           </Nodes>
           <Edges>
-            <Edge From="2" To="3" Label="Source1" />
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
             <Edge From="3" To="4" Label="Source1" />
-            <Edge From="5" To="6" Label="Source1" />
+            <Edge From="4" To="5" Label="Source1" />
+            <Edge From="6" To="7" Label="Source1" />
             <Edge From="7" To="8" Label="Source1" />
             <Edge From="9" To="10" Label="Source1" />
-            <Edge From="1" To="10" Label="Source2" />
-            <Edge From="6" To="11" Label="Source1" />
-            <Edge From="8" To="11" Label="Source2" />
-            <Edge From="10" To="11" Label="Source3" />
-            <Edge From="11" To="12" Label="Source1" />
-            <Edge From="0" To="13" Label="Source1" />
-            <Edge From="13" To="2" Label="Source1" />
-            <Edge From="13" To="5" Label="Source1" />
-            <Edge From="13" To="7" Label="Source1" />
-            <Edge From="13" To="9" Label="Source1" />
+            <Edge From="10" To="11" Label="Source1" />
+            <Edge From="12" To="13" Label="Source1" />
+            <Edge From="13" To="14" Label="Source1" />
+            <Edge From="15" To="16" Label="Source1" />
+            <Edge From="16" To="17" Label="Source1" />
+            <Edge From="18" To="19" Label="Source1" />
+            <Edge From="19" To="20" Label="Source1" />
+            <Edge From="21" To="22" Label="Source1" />
+            <Edge From="22" To="23" Label="Source1" />
+            <Edge From="24" To="25" Label="Source1" />
+            <Edge From="25" To="26" Label="Source1" />
+            <Edge From="27" To="28" Label="Source1" />
+            <Edge From="28" To="29" Label="Source1" />
           </Edges>
         </Workflow>
       </Expression>
       <Expression xsi:type="GroupWorkflow">
-        <Name>Ready</Name>
-        <Description>Once every device has opened or failed: Ready, and from then the devices metric once a second. Take(1) is a branch of its own off DeviceRates, so the metric goes on after Ready; after ReportMetric it ended the metric at its first report (the first second after opening, stale ever after).</Description>
+        <Name>Commands</Name>
+        <Description>A person's Pulse and Reset on BehaviorBoard-Main (BoardCommands, from its rig.yml entry, the piece's AsyncSubject), and Move and Home on each lick spout stage driver (StepperCommands, from rig.yml's wiring, homing on the driver's own data), as Harp writes multicast into each piece's own Commands subject: no device is opened here.</Description>
         <Workflow>
           <Nodes>
             <Expression xsi:type="SubscribeSubject">
-              <Name>Devices</Name>
+              <Name>BehaviorBoard-Main</Name>
             </Expression>
             <Expression xsi:type="SubscribeSubject">
-              <Name>DeviceReports</Name>
+              <Name>ControlEvents</Name>
             </Expression>
             <Expression xsi:type="Combinator">
-              <Combinator xsi:type="p1:DeviceRates">
-                <p1:NotOpened>speakerArray</p1:NotOpened>
+              <Combinator xsi:type="orcl:OnCommand">
+                <orcl:Name>Pulse</orcl:Name>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>ControlEvents</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="orcl:OnCommand">
+                <orcl:Name>Reset</orcl:Name>
               </Combinator>
             </Expression>
             <Expression xsi:type="Combinator">
-              <Combinator xsi:type="orcl:ReportMetric">
-                <orcl:Name>devices</orcl:Name>
+              <Combinator xsi:type="p1:BoardCommands" />
+            </Expression>
+            <Expression xsi:type="MulticastSubject">
+              <Name>BehaviorBoard-Main.Commands</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>ControlEvents</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="orcl:OnCommand">
+                <orcl:Name>Move</orcl:Name>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="rx:PublishSubject">
+              <Name>MoveCommands</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>ControlEvents</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="orcl:OnCommand">
+                <orcl:Name>Home</orcl:Name>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="rx:PublishSubject">
+              <Name>HomeCommands</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>RigConfigs</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>StepperDriver-A.Data</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>MoveCommands</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>HomeCommands</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="p1:StepperCommands">
+                <p1:Driver>StepperDriver-A</p1:Driver>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="MulticastSubject">
+              <Name>StepperDriver-A.Commands</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>RigConfigs</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>StepperDriver-B.Data</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>MoveCommands</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>HomeCommands</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="p1:StepperCommands">
+                <p1:Driver>StepperDriver-B</p1:Driver>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="MulticastSubject">
+              <Name>StepperDriver-B.Commands</Name>
+            </Expression>
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="5" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+            <Edge From="2" To="5" Label="Source2" />
+            <Edge From="3" To="4" Label="Source1" />
+            <Edge From="4" To="5" Label="Source3" />
+            <Edge From="5" To="6" Label="Source1" />
+            <Edge From="7" To="8" Label="Source1" />
+            <Edge From="8" To="9" Label="Source1" />
+            <Edge From="10" To="11" Label="Source1" />
+            <Edge From="11" To="12" Label="Source1" />
+            <Edge From="13" To="17" Label="Source1" />
+            <Edge From="14" To="17" Label="Source2" />
+            <Edge From="15" To="17" Label="Source3" />
+            <Edge From="16" To="17" Label="Source4" />
+            <Edge From="17" To="18" Label="Source1" />
+            <Edge From="19" To="23" Label="Source1" />
+            <Edge From="20" To="23" Label="Source2" />
+            <Edge From="21" To="23" Label="Source3" />
+            <Edge From="22" To="23" Label="Source4" />
+            <Edge From="23" To="24" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="GroupWorkflow">
+        <Name>SpeakerTest</Name>
+        <Description>A test sound for each rig.yml speaker, laid out by OpenRigs.Audio SpeakerBuffer on that speaker's channel alone, equalised, at the lab's default level (SpeakerBuffer's LevelDbfs, -30 dBFS RMS), through DomeHardware's mixer. Once the check asks "SpeakerArray: ..." (CheckEvents), the speakers play their test sound in rig.yml's order, one after another, every 5 s until the person's Confirm for SpeakerArray (PreflightChecks' Confirms); each sound the mixer is sent is counted for its speaker (CountSpeakerSounds into SpeakerSounds: the devices metric and the raw rows). The test sound is a 0.3 s 1 kHz tone then 0.3 s of silence (Bonsai.Dsp FunctionGenerator at 48 kHz).</Description>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="dsp:FunctionGenerator">
+                <dsp:BufferLength>14400</dsp:BufferLength>
+                <dsp:Frequency>1000</dsp:Frequency>
+                <dsp:Waveform>Sine</dsp:Waveform>
+                <dsp:SampleRate>48000</dsp:SampleRate>
+                <dsp:Depth>F32</dsp:Depth>
+                <dsp:Amplitude>1</dsp:Amplitude>
+                <dsp:Offset>0</dsp:Offset>
+                <dsp:Phase>0</dsp:Phase>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="dsp:FunctionGenerator">
+                <dsp:BufferLength>14400</dsp:BufferLength>
+                <dsp:Frequency>1000</dsp:Frequency>
+                <dsp:Waveform>Sine</dsp:Waveform>
+                <dsp:SampleRate>48000</dsp:SampleRate>
+                <dsp:Depth>F32</dsp:Depth>
+                <dsp:Amplitude>0</dsp:Amplitude>
+                <dsp:Offset>0</dsp:Offset>
+                <dsp:Phase>0</dsp:Phase>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="rx:Zip" />
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="dsp:Concat">
+                <dsp:Axis>1</dsp:Axis>
               </Combinator>
             </Expression>
             <Expression xsi:type="Combinator">
@@ -511,116 +381,91 @@
                 <rx:Count>1</rx:Count>
               </Combinator>
             </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="orcl:ReportPhase">
-                <orcl:Phase>Ready</orcl:Phase>
-              </Combinator>
+            <Expression xsi:type="rx:AsyncSubject">
+              <Name>TestTone</Name>
             </Expression>
             <Expression xsi:type="SubscribeSubject">
-              <Name>SpeakerSounds</Name>
-            </Expression>
-          </Nodes>
-          <Edges>
-            <Edge From="0" To="2" Label="Source1" />
-            <Edge From="1" To="2" Label="Source2" />
-            <Edge From="6" To="2" Label="Source3" />
-            <Edge From="2" To="3" Label="Source1" />
-            <Edge From="2" To="4" Label="Source1" />
-            <Edge From="4" To="5" Label="Source1" />
-          </Edges>
-        </Workflow>
-      </Expression>
-      <Expression xsi:type="GroupWorkflow">
-        <Name>Check</Name>
-        <Description>From Go: each open device counted in turn (step metric), then each device a person confirms asked in turn (prompt metric, answered by Confirm). The rows go to RawFile, which is closed before Finished.</Description>
-        <Workflow>
-          <Nodes>
-            <Expression xsi:type="ExternalizedMapping">
-              <Property Name="FileName" DisplayName="RawFile" />
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>Devices</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>DeviceReports</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>ExperimentGo</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>ControlEvents</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="orcl:OnCommand">
-                <orcl:Name>Confirm</orcl:Name>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="p1:RunCheck">
-                <p1:NotOpened>speakerArray</p1:NotOpened>
-                <p1:Questions>speakerArray=Did each speaker play the test sound?;projectionCalibration=Does the test pattern fill the screen?</p1:Questions>
-                <p1:Seconds>5</p1:Seconds>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="rx:PublishSubject">
-              <Name>CheckEvents</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>CheckEvents</Name>
+              <Name>Speakers</Name>
             </Expression>
             <Expression xsi:type="MemberSelector">
-              <Selector>Step</Selector>
+              <Selector>Speakers</Selector>
             </Expression>
             <Expression xsi:type="Combinator">
-              <Combinator xsi:type="rx:DistinctUntilChanged" />
+              <Combinator xsi:type="rx:Merge" />
             </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="orcl:ReportMetric">
-                <orcl:Name>step</orcl:Name>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>CheckEvents</Name>
-            </Expression>
-            <Expression xsi:type="MemberSelector">
-              <Selector>Prompt</Selector>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="rx:DistinctUntilChanged" />
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="orcl:ReportMetric">
-                <orcl:Name>prompt</orcl:Name>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>CheckEvents</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="p1:RowsOf" />
-            </Expression>
-            <Expression xsi:type="orl:CsvWriter">
-              <io:FileName>preflight-raw.csv</io:FileName>
-              <io:Append>false</io:Append>
-              <io:Overwrite>true</io:Overwrite>
-              <io:Suffix>None</io:Suffix>
-              <io:IncludeHeader>true</io:IncludeHeader>
-              <io:Selector />
-              <orl:AutoFlush>false</orl:AutoFlush>
-              <orl:PublishRows>false</orl:PublishRows>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>CheckEvents</Name>
-            </Expression>
-            <Expression xsi:type="rx:Condition">
-              <Name>Done</Name>
+            <Expression xsi:type="rx:SelectMany">
+              <Name>TestSound</Name>
+              <Description>One speaker's test sound: SpeakerBuffer on its channel alone, equalised for it, at the lab's default level.</Description>
               <Workflow>
                 <Nodes>
                   <Expression xsi:type="WorkflowInput">
                     <Name>Source1</Name>
                   </Expression>
                   <Expression xsi:type="MemberSelector">
-                    <Selector>Done</Selector>
+                    <Selector>Channel</Selector>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="rx:ToArray" />
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>Speakers</Name>
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>TestTone</Name>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="rx:Zip" />
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="rx:Zip" />
+                  </Expression>
+                  <Expression xsi:type="InputMapping">
+                    <PropertyMappings>
+                      <Property Name="Channels" Selector="Item1" />
+                    </PropertyMappings>
+                    <Selector>Item2</Selector>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="aud:SpeakerBuffer">
+                      <aud:Channels />
+                      <aud:LevelDbfs>-30</aud:LevelDbfs>
+                      <aud:Equalise>true</aud:Equalise>
+                      <aud:SyncCopy>false</aud:SyncCopy>
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="WorkflowOutput" />
+                </Nodes>
+                <Edges>
+                  <Edge From="0" To="1" Label="Source1" />
+                  <Edge From="1" To="2" Label="Source1" />
+                  <Edge From="3" To="5" Label="Source1" />
+                  <Edge From="4" To="5" Label="Source2" />
+                  <Edge From="2" To="6" Label="Source1" />
+                  <Edge From="5" To="6" Label="Source2" />
+                  <Edge From="6" To="7" Label="Source1" />
+                  <Edge From="7" To="8" Label="Source1" />
+                  <Edge From="8" To="9" Label="Source1" />
+                </Edges>
+              </Workflow>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="rx:ToList" />
+            </Expression>
+            <Expression xsi:type="rx:AsyncSubject">
+              <Name>TestSounds</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>CheckEvents</Name>
+            </Expression>
+            <Expression xsi:type="rx:Condition">
+              <Name>SpeakersAsked?</Name>
+              <Workflow>
+                <Nodes>
+                  <Expression xsi:type="WorkflowInput">
+                    <Name>Source1</Name>
+                  </Expression>
+                  <Expression xsi:type="scr:ExpressionTransform">
+                    <scr:Expression>Prompt != null &amp;&amp; Prompt.StartsWith("SpeakerArray:")</scr:Expression>
                   </Expression>
                   <Expression xsi:type="WorkflowOutput" />
                 </Nodes>
@@ -631,402 +476,141 @@
               </Workflow>
             </Expression>
             <Expression xsi:type="Combinator">
-              <Combinator xsi:type="rx:Delay">
-                <rx:DueTime>PT1.5S</rx:DueTime>
+              <Combinator xsi:type="rx:Take">
+                <rx:Count>1</rx:Count>
               </Combinator>
             </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="orcl:ReportPhase">
-                <orcl:Phase>Finished</orcl:Phase>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="Annotation">
-              <Name>Finished after the file</Name>
-              <Text><![CDATA[CheckEvents completes after its Done state, which closes CsvWriter (its subscription ends with the stream), and Finished is reported 1.5 s after Done: the agent stops the workflow 2 s after Finished and then judges RawFile, so the file is complete well before.]]></Text>
+            <Expression xsi:type="rx:SelectMany">
+              <Name>PlayUntilAnswered</Name>
+              <Description>Every speaker's test sound, sent together: the mixer plays them one after another (AppendBuffer queues each behind the last); again every 5 s until the person's Confirm for SpeakerArray after Go.</Description>
+              <Workflow>
+                <Nodes>
+                  <Expression xsi:type="WorkflowInput">
+                    <Name>Source1</Name>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="rx:Timer">
+                      <rx:DueTime>PT0S</rx:DueTime>
+                      <rx:Period>PT5S</rx:Period>
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>Confirms</Name>
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>ExperimentGo</Name>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="dev:Answered">
+                      <dev:Device>SpeakerArray</dev:Device>
+                    </Combinator>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="rx:TakeUntil" />
+                  </Expression>
+                  <Expression xsi:type="SubscribeSubject">
+                    <Name>TestSounds</Name>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="rx:WithLatestFrom" />
+                  </Expression>
+                  <Expression xsi:type="MemberSelector">
+                    <Selector>Item2</Selector>
+                  </Expression>
+                  <Expression xsi:type="Combinator">
+                    <Combinator xsi:type="rx:Merge" />
+                  </Expression>
+                  <Expression xsi:type="MulticastSubject">
+                    <Name>StimulusSounds</Name>
+                  </Expression>
+                  <Expression xsi:type="WorkflowOutput" />
+                </Nodes>
+                <Edges>
+                  <Edge From="2" To="4" Label="Source1" />
+                  <Edge From="3" To="4" Label="Source2" />
+                  <Edge From="1" To="5" Label="Source1" />
+                  <Edge From="4" To="5" Label="Source2" />
+                  <Edge From="5" To="7" Label="Source1" />
+                  <Edge From="6" To="7" Label="Source2" />
+                  <Edge From="7" To="8" Label="Source1" />
+                  <Edge From="8" To="9" Label="Source1" />
+                  <Edge From="9" To="10" Label="Source1" />
+                  <Edge From="10" To="11" Label="Source1" />
+                </Edges>
+              </Workflow>
             </Expression>
             <Expression xsi:type="SubscribeSubject">
+              <Name>MixerStimulusSounds</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>RigConfigs</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Description>The evidence the speakers were played to: each sound the mixer is sent (past SpeakerMixer's CheckMixerStarted, on its way to AppendBuffer) counted for every rig.yml speaker whose channel carries sound in it, a stderr line each (preflight: SpeakerArray left test sound 1 sent to the mixer).</Description>
+              <Combinator xsi:type="p1:CountSpeakerSounds" />
+            </Expression>
+            <Expression xsi:type="MulticastSubject">
               <Name>SpeakerSounds</Name>
             </Expression>
           </Nodes>
           <Edges>
-            <Edge From="1" To="6" Label="Source1" />
-            <Edge From="2" To="6" Label="Source2" />
-            <Edge From="3" To="6" Label="Source3" />
+            <Edge From="0" To="2" Label="Source1" />
+            <Edge From="1" To="2" Label="Source2" />
+            <Edge From="2" To="3" Label="Source1" />
+            <Edge From="3" To="4" Label="Source1" />
             <Edge From="4" To="5" Label="Source1" />
-            <Edge From="5" To="6" Label="Source4" />
             <Edge From="6" To="7" Label="Source1" />
+            <Edge From="7" To="8" Label="Source1" />
             <Edge From="8" To="9" Label="Source1" />
             <Edge From="9" To="10" Label="Source1" />
             <Edge From="10" To="11" Label="Source1" />
             <Edge From="12" To="13" Label="Source1" />
             <Edge From="13" To="14" Label="Source1" />
             <Edge From="14" To="15" Label="Source1" />
-            <Edge From="16" To="17" Label="Source1" />
-            <Edge From="17" To="18" Label="Source1" />
-            <Edge From="0" To="18" Label="Source2" />
-            <Edge From="19" To="20" Label="Source1" />
-            <Edge From="20" To="21" Label="Source1" />
-            <Edge From="21" To="22" Label="Source1" />
-            <Edge From="24" To="6" Label="Source5" />
+            <Edge From="16" To="18" Label="Source1" />
+            <Edge From="17" To="18" Label="Source2" />
+            <Edge From="18" To="19" Label="Source1" />
           </Edges>
         </Workflow>
       </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="p1:HarpDeviceData">
-          <p1:Device>BehaviorBoard-Main</p1:Device>
-        </Combinator>
-      </Expression>
-      <Expression xsi:type="rx:PublishSubject">
-        <Name>BehaviorBoard-Main.Data</Name>
-      </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="p1:CameraDeviceData">
-          <p1:Device>Camera-Face</p1:Device>
-        </Combinator>
-      </Expression>
-      <Expression xsi:type="rx:PublishSubject">
-        <Name>Camera-Face.Data</Name>
-      </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="p1:CameraDeviceData">
-          <p1:Device>Camera-Pupil</p1:Device>
-        </Combinator>
-      </Expression>
-      <Expression xsi:type="rx:PublishSubject">
-        <Name>Camera-Pupil.Data</Name>
-      </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="p1:CameraDeviceData">
-          <p1:Device>Camera-Body</p1:Device>
-        </Combinator>
-      </Expression>
-      <Expression xsi:type="rx:PublishSubject">
-        <Name>Camera-Body.Data</Name>
-      </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="p1:HarpDeviceData">
-          <p1:Device>LicketySplit-Left</p1:Device>
-        </Combinator>
-      </Expression>
-      <Expression xsi:type="rx:PublishSubject">
-        <Name>LicketySplit-Left.Data</Name>
-      </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="p1:HarpDeviceData">
-          <p1:Device>LicketySplit-Right</p1:Device>
-        </Combinator>
-      </Expression>
-      <Expression xsi:type="rx:PublishSubject">
-        <Name>LicketySplit-Right.Data</Name>
-      </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="p1:HarpDeviceData">
-          <p1:Device>StepperDriver-A</p1:Device>
-        </Combinator>
-      </Expression>
-      <Expression xsi:type="rx:PublishSubject">
-        <Name>StepperDriver-A.Data</Name>
-      </Expression>
-      <Expression xsi:type="Combinator">
-        <Combinator xsi:type="p1:HarpDeviceData">
-          <p1:Device>StepperDriver-B</p1:Device>
-        </Combinator>
-      </Expression>
-      <Expression xsi:type="rx:PublishSubject">
-        <Name>StepperDriver-B.Data</Name>
-      </Expression>
       <Expression xsi:type="GroupWorkflow">
-        <Name>SpeakerTest</Name>
-        <Description>Only for a rig whose rig.yml has a speakerArray: the lab's speaker mixer (OpenRigs.Audio SpeakerMixer: Speakers, every filter checked, and the mixer started no sooner than 3 s after Start), and a test sound for each speaker, laid out by OpenRigs.Audio SpeakerBuffer on that speaker's channel alone, equalised, at the lab's default level (SpeakerBuffer's LevelDbfs, -30 dBFS RMS). Once the check asks "SpeakerArray: Did each speaker play the test sound?", the speakers play their test sound in rig.yml's order, one after another, every 5 s until the person's Confirm for SpeakerArray; each sound the mixer is sent is counted for its speaker (CountSpeakerSounds into SpeakerSounds: the devices metric and the raw rows). The test sound is a 0.3 s 1 kHz tone then 0.3 s of silence (Bonsai.Dsp FunctionGenerator at 48 kHz).</Description>
+        <Name>TestPattern</Name>
+        <Description>A white rectangle drawn on DomeHardware's projector (DrawStimuli) from Start until the stop, for the question "Does the test pattern fill the screen?".</Description>
         <Workflow>
           <Nodes>
             <Expression xsi:type="SubscribeSubject">
-              <Name>RigConfigs</Name>
+              <Name>DrawStimuli</Name>
             </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="p1:PreflightDevices">
-                <p1:Kinds>speakerArray</p1:Kinds>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="rx:SelectMany">
-              <Name>SpeakerArray</Name>
-              <Workflow>
-                <Nodes>
-                  <Expression xsi:type="WorkflowInput">
-                    <Name>Source1</Name>
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>RigConfigDirectory</Name>
-                  </Expression>
-                  <Expression xsi:type="scr:ExpressionTransform">
-                    <scr:Expression>it + "\\rig.yml"</scr:Expression>
-                  </Expression>
-                  <Expression xsi:type="rx:AsyncSubject">
-                    <Name>RigFile</Name>
-                  </Expression>
-                  <Expression xsi:type="rx:ReplaySubject" TypeArguments="sys:String">
-                    <rx:Name>ReadyStages</rx:Name>
-                  </Expression>
-                  <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Audio:SpeakerMixer.bonsai" />
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="dsp:FunctionGenerator">
-                      <dsp:BufferLength>14400</dsp:BufferLength>
-                      <dsp:Frequency>1000</dsp:Frequency>
-                      <dsp:Waveform>Sine</dsp:Waveform>
-                      <dsp:SampleRate>48000</dsp:SampleRate>
-                      <dsp:Depth>F32</dsp:Depth>
-                      <dsp:Amplitude>1</dsp:Amplitude>
-                      <dsp:Offset>0</dsp:Offset>
-                      <dsp:Phase>0</dsp:Phase>
-                    </Combinator>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="dsp:FunctionGenerator">
-                      <dsp:BufferLength>14400</dsp:BufferLength>
-                      <dsp:Frequency>1000</dsp:Frequency>
-                      <dsp:Waveform>Sine</dsp:Waveform>
-                      <dsp:SampleRate>48000</dsp:SampleRate>
-                      <dsp:Depth>F32</dsp:Depth>
-                      <dsp:Amplitude>0</dsp:Amplitude>
-                      <dsp:Offset>0</dsp:Offset>
-                      <dsp:Phase>0</dsp:Phase>
-                    </Combinator>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="rx:Zip" />
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="dsp:Concat">
-                      <dsp:Axis>1</dsp:Axis>
-                    </Combinator>
-                  </Expression>
-                  <Expression xsi:type="rx:AsyncSubject">
-                    <Name>TestTone</Name>
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>Speakers</Name>
-                  </Expression>
-                  <Expression xsi:type="MemberSelector">
-                    <Selector>Speakers</Selector>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="rx:Merge" />
-                  </Expression>
-                  <Expression xsi:type="rx:SelectMany">
-                    <Name>TestSound</Name>
-                    <Description>One speaker's test sound: SpeakerBuffer on its channel alone, equalised for it, at the lab's default level.</Description>
-                    <Workflow>
-                      <Nodes>
-                        <Expression xsi:type="WorkflowInput">
-                          <Name>Source1</Name>
-                        </Expression>
-                        <Expression xsi:type="MemberSelector">
-                          <Selector>Channel</Selector>
-                        </Expression>
-                        <Expression xsi:type="Combinator">
-                          <Combinator xsi:type="rx:ToArray" />
-                        </Expression>
-                        <Expression xsi:type="SubscribeSubject">
-                          <Name>Speakers</Name>
-                        </Expression>
-                        <Expression xsi:type="SubscribeSubject">
-                          <Name>TestTone</Name>
-                        </Expression>
-                        <Expression xsi:type="Combinator">
-                          <Combinator xsi:type="rx:Zip" />
-                        </Expression>
-                        <Expression xsi:type="Combinator">
-                          <Combinator xsi:type="rx:Zip" />
-                        </Expression>
-                        <Expression xsi:type="InputMapping">
-                          <PropertyMappings>
-                            <Property Name="Channels" Selector="Item1" />
-                          </PropertyMappings>
-                          <Selector>Item2</Selector>
-                        </Expression>
-                        <Expression xsi:type="Combinator">
-                          <Combinator xsi:type="aud:SpeakerBuffer">
-                            <aud:Channels />
-                            <aud:LevelDbfs>-30</aud:LevelDbfs>
-                            <aud:Equalise>true</aud:Equalise>
-                            <aud:SyncCopy>false</aud:SyncCopy>
-                          </Combinator>
-                        </Expression>
-                        <Expression xsi:type="WorkflowOutput" />
-                      </Nodes>
-                      <Edges>
-                        <Edge From="0" To="1" Label="Source1" />
-                        <Edge From="1" To="2" Label="Source1" />
-                        <Edge From="3" To="5" Label="Source1" />
-                        <Edge From="4" To="5" Label="Source2" />
-                        <Edge From="2" To="6" Label="Source1" />
-                        <Edge From="5" To="6" Label="Source2" />
-                        <Edge From="6" To="7" Label="Source1" />
-                        <Edge From="7" To="8" Label="Source1" />
-                        <Edge From="8" To="9" Label="Source1" />
-                      </Edges>
-                    </Workflow>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="rx:ToList" />
-                  </Expression>
-                  <Expression xsi:type="rx:AsyncSubject">
-                    <Name>TestSounds</Name>
-                  </Expression>
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>CheckEvents</Name>
-                  </Expression>
-                  <Expression xsi:type="rx:Condition">
-                    <Name>SpeakersAsked?</Name>
-                    <Workflow>
-                      <Nodes>
-                        <Expression xsi:type="WorkflowInput">
-                          <Name>Source1</Name>
-                        </Expression>
-                        <Expression xsi:type="scr:ExpressionTransform">
-                          <scr:Expression>Prompt != null &amp;&amp; Prompt.StartsWith("SpeakerArray:")</scr:Expression>
-                        </Expression>
-                        <Expression xsi:type="WorkflowOutput" />
-                      </Nodes>
-                      <Edges>
-                        <Edge From="0" To="1" Label="Source1" />
-                        <Edge From="1" To="2" Label="Source1" />
-                      </Edges>
-                    </Workflow>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Combinator xsi:type="rx:Take">
-                      <rx:Count>1</rx:Count>
-                    </Combinator>
-                  </Expression>
-                  <Expression xsi:type="rx:SelectMany">
-                    <Name>PlayUntilAnswered</Name>
-                    <Description>Every speaker's test sound, sent together: the mixer plays them one after another (AppendBuffer queues each behind the last); again every 5 s until the person's Confirm for SpeakerArray after Go.</Description>
-                    <Workflow>
-                      <Nodes>
-                        <Expression xsi:type="WorkflowInput">
-                          <Name>Source1</Name>
-                        </Expression>
-                        <Expression xsi:type="Combinator">
-                          <Combinator xsi:type="rx:Timer">
-                            <rx:DueTime>PT0S</rx:DueTime>
-                            <rx:Period>PT5S</rx:Period>
-                          </Combinator>
-                        </Expression>
-                        <Expression xsi:type="SubscribeSubject">
-                          <Name>ControlEvents</Name>
-                        </Expression>
-                        <Expression xsi:type="Combinator">
-                          <Combinator xsi:type="orcl:OnCommand">
-                            <orcl:Name>Confirm</orcl:Name>
-                          </Combinator>
-                        </Expression>
-                        <Expression xsi:type="SubscribeSubject">
-                          <Name>ExperimentGo</Name>
-                        </Expression>
-                        <Expression xsi:type="Combinator">
-                          <Combinator xsi:type="p1:Answered">
-                            <p1:Device>SpeakerArray</p1:Device>
-                          </Combinator>
-                        </Expression>
-                        <Expression xsi:type="Combinator">
-                          <Combinator xsi:type="rx:TakeUntil" />
-                        </Expression>
-                        <Expression xsi:type="SubscribeSubject">
-                          <Name>TestSounds</Name>
-                        </Expression>
-                        <Expression xsi:type="Combinator">
-                          <Combinator xsi:type="rx:WithLatestFrom" />
-                        </Expression>
-                        <Expression xsi:type="MemberSelector">
-                          <Selector>Item2</Selector>
-                        </Expression>
-                        <Expression xsi:type="Combinator">
-                          <Combinator xsi:type="rx:Merge" />
-                        </Expression>
-                        <Expression xsi:type="MulticastSubject">
-                          <Name>StimulusSounds</Name>
-                        </Expression>
-                        <Expression xsi:type="WorkflowOutput" />
-                      </Nodes>
-                      <Edges>
-                        <Edge From="2" To="3" Label="Source1" />
-                        <Edge From="3" To="5" Label="Source1" />
-                        <Edge From="4" To="5" Label="Source2" />
-                        <Edge From="1" To="6" Label="Source1" />
-                        <Edge From="5" To="6" Label="Source2" />
-                        <Edge From="6" To="8" Label="Source1" />
-                        <Edge From="7" To="8" Label="Source2" />
-                        <Edge From="8" To="9" Label="Source1" />
-                        <Edge From="9" To="10" Label="Source1" />
-                        <Edge From="10" To="11" Label="Source1" />
-                        <Edge From="11" To="12" Label="Source1" />
-                      </Edges>
-                    </Workflow>
-                  </Expression>
-                  <Expression xsi:type="WorkflowOutput" />
-                  <Expression xsi:type="SubscribeSubject">
-                    <Name>MixerStimulusSounds</Name>
-                  </Expression>
-                  <Expression xsi:type="Combinator">
-                    <Description>The evidence the speakers were played to: each sound the mixer is sent (past SpeakerMixer's CheckMixerStarted, on its way to AppendBuffer) counted for every rig.yml speaker whose channel carries sound in it, a stderr line each (preflight: SpeakerArray left test sound 1 sent to the mixer).</Description>
-                    <Combinator xsi:type="p1:CountSpeakerSounds" />
-                  </Expression>
-                  <Expression xsi:type="MulticastSubject">
-                    <Name>SpeakerSounds</Name>
-                  </Expression>
-                </Nodes>
-                <Edges>
-                  <Edge From="1" To="2" Label="Source1" />
-                  <Edge From="2" To="3" Label="Source1" />
-                  <Edge From="0" To="6" Label="Source1" />
-                  <Edge From="0" To="7" Label="Source1" />
-                  <Edge From="6" To="8" Label="Source1" />
-                  <Edge From="7" To="8" Label="Source2" />
-                  <Edge From="8" To="9" Label="Source1" />
-                  <Edge From="9" To="10" Label="Source1" />
-                  <Edge From="11" To="12" Label="Source1" />
-                  <Edge From="12" To="13" Label="Source1" />
-                  <Edge From="13" To="14" Label="Source1" />
-                  <Edge From="14" To="15" Label="Source1" />
-                  <Edge From="15" To="16" Label="Source1" />
-                  <Edge From="17" To="18" Label="Source1" />
-                  <Edge From="18" To="19" Label="Source1" />
-                  <Edge From="19" To="20" Label="Source1" />
-                  <Edge From="20" To="21" Label="Source1" />
-                  <Edge From="22" To="23" Label="Source1" />
-                  <Edge From="0" To="23" Label="Source2" />
-                  <Edge From="23" To="24" Label="Source1" />
-                </Edges>
-              </Workflow>
+            <Expression xsi:type="IncludeWorkflow" Path="BonVision:Primitives.DrawQuad.bonsai">
+              <ExtentX>120</ExtentX>
+              <ExtentY>60</ExtentY>
+              <LocationX>0</LocationX>
+              <LocationY>30</LocationY>
+              <Layer>0</Layer>
+              <Angle>0</Angle>
+              <ColorR>1</ColorR>
+              <ColorG>1</ColorG>
+              <ColorB>1</ColorB>
+              <ColorA>1</ColorA>
             </Expression>
           </Nodes>
           <Edges>
             <Edge From="0" To="1" Label="Source1" />
-            <Edge From="1" To="2" Label="Source1" />
           </Edges>
         </Workflow>
       </Expression>
       <Expression xsi:type="lv:StreamDevices">
         <Name>LiveView</Name>
-        <Description>Streams this rig's Behavior board, Lickety Splits, stepper drivers and cameras to rig-control's live view (OpenRigs.LiveView): data on TCP 5556, video on 5558, as the lab's workflows do. Their &lt;Device&gt;.Data subjects come from the branches through ShareDeviceData, one per name the lab's workflows use (BehaviorBoard-Main, LicketySplit-Left, LicketySplit-Right, StepperDriver-A, StepperDriver-B, Camera-Face, Camera-Pupil, Camera-Body; the RigDevice names, 11 Nov 2026). No experiment folder, so the session key stays ready. Last in the workflow: it finds only subjects built before it.</Description>
+        <Description>Streams every rig.yml device the pieces publish (their &lt;Device&gt;.Data) to rig-control's live view (OpenRigs.LiveView): data on TCP 5556, video on 5558. No experiment folder, so the session key stays ready. Last in the workflow: it finds only subjects built before it.</Description>
         <lv:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</lv:ConfigRoot>
         <lv:DataPort>5556</lv:DataPort>
         <lv:VideoPort>5558</lv:VideoPort>
       </Expression>
     </Nodes>
     <Edges>
-      <Edge From="2" To="3" Label="Source1" />
-      <Edge From="0" To="4" Label="Source1" />
-      <Edge From="1" To="6" Label="Source1" />
-      <Edge From="7" To="8" Label="Source1" />
-      <Edge From="9" To="10" Label="Source1" />
-      <Edge From="11" To="12" Label="Source1" />
-      <Edge From="13" To="14" Label="Source1" />
-      <Edge From="15" To="16" Label="Source1" />
-      <Edge From="17" To="18" Label="Source1" />
-      <Edge From="19" To="20" Label="Source1" />
-      <Edge From="21" To="22" Label="Source1" />
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

@@ -1,0 +1,163 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<WorkflowBuilder Version="2.9.0"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:p1="clr-namespace:;assembly=Extensions"
+                 xmlns:rx="clr-namespace:Bonsai.Reactive;assembly=Bonsai.Core"
+                 xmlns:dev="clr-namespace:OpenRigs.Devices;assembly=OpenRigs.Devices"
+                 xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
+                 xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
+                 xmlns="https://bonsai-rx.org/2018/workflow">
+  <Description>The behaviour boxes' preflight, run from rig-control's Preflight page and card as the test mouse: the boxes' rig list (OpenRigs.Devices BBoxHardware) opens and readies every device as the box task does, no experiment folder (NoExperimentFolder), and the lab's check (OpenRigs.Devices PreflightChecks) counts each rig.yml device from its piece's data (Taps) and, from Go, writes the raw rows to RawFile with the questions of TaskPath (config\task-box.yml). A device that fails as it opens stops the preflight naming it, as it stops the task. Commands Pulse and Reset on BehaviorBoard-Main, written into the board piece's own command subject (Commands). coen_qc_preflight_rig.judge applies the thresholds.</Description>
+  <Workflow>
+    <Nodes>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="ConfigRoot" Description="The folder holding &lt;MACHINE&gt;\rig.yml; a launch property." />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
+        <ConfigRoot>C:\Coen-Lab-Local\RigConfigs</ConfigRoot>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:NoExperimentFolder.bonsai">
+        <SubjectId>_preflight_</SubjectId>
+      </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="SubjectId" />
+        <Property Name="SessionId" />
+      </Expression>
+      <Expression xsi:type="GroupWorkflow">
+        <Name>Initialization</Name>
+        <Description>The experiment controller (OpenRigs.Control, ExperimentControl, TCP 5561 on this machine): commands Pulse and Reset (Confirm is PreflightChecks'). EndAfterStop ends headless Bonsai when it is still running 2 s after the controller's stop.</Description>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="ExternalizedMapping">
+              <Property Name="SubjectId" />
+              <Property Name="SessionId" />
+            </Expression>
+            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Control:ExperimentControl.bonsai">
+              <SubjectId />
+              <SessionId />
+              <ControlEndpoint>@tcp://127.0.0.1:5561</ControlEndpoint>
+              <Parameters />
+              <Commands>
+                <Command>
+                  <Name>Pulse</Name>
+                  <Description>One pulse on a behaviour board line: the text is the board and line, such as BehaviorBoard-Main DO1. Its length is the line's pulseWidthMs in rig.yml, else 50 ms, or a width in ms given third, 1 to 60000 (BehaviorBoard-Main DO1 10000: rig-control's Flush, a valve open 10 s). On DO1 to DO3 the board times it, so it ends even if the workflow stops. Never on a CameraTrigger or ZapitTrigger line.</Description>
+                </Command>
+                <Command>
+                  <Name>Reset</Name>
+                  <Description>The behaviour board put back as an experiment expects it: each DO line not a camera trigger closed now (a Flush too), each fixed line's PulseDO width and the pulsed lines as rig.yml has them. The text is empty, or the board's name. rig-control's End Testing sends it before the stop.</Description>
+                </Command>
+              </Commands>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Description>Ends headless Bonsai when it is still running 2 s after the controller's stop: the live view's publisher threads keep the process alive until every device's teardown reaches them, and one held up kept Bonsai running until the agent's kill 30 s after End Testing (GREEN-DOME-2, 15 Nov 2026). Nothing in the editor.</Description>
+              <Combinator xsi:type="p1:EndAfterStop">
+                <p1:GraceSeconds>2</p1:GraceSeconds>
+              </Combinator>
+            </Expression>
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BBoxHardware.bonsai" />
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="RawFile" Description="Where the raw rows go; a launch property." />
+        <Property Name="TaskPath" Description="The task file app-rig-control writes at Go: config\task-box.yml with the form's edits." />
+      </Expression>
+      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:PreflightChecks.bonsai">
+        <RawFile>preflight-raw.csv</RawFile>
+        <TaskPath>..\config\task-box.yml</TaskPath>
+      </Expression>
+      <Expression xsi:type="GroupWorkflow">
+        <Name>Taps</Name>
+        <Description>Each device piece's data as the check's ticks (OpenRigs.Devices PreflightTap into DeviceTicks), by the device's rig.yml name.</Description>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>BehaviorBoard-Main.Data</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="dev:PreflightTap">
+                <dev:Device>BehaviorBoard-Main</dev:Device>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="MulticastSubject">
+              <Name>DeviceTicks</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>Camera-Overhead.Data</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="dev:PreflightTap">
+                <dev:Device>Camera-Overhead</dev:Device>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="MulticastSubject">
+              <Name>DeviceTicks</Name>
+            </Expression>
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+            <Edge From="3" To="4" Label="Source1" />
+            <Edge From="4" To="5" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="GroupWorkflow">
+        <Name>Commands</Name>
+        <Description>A person's Pulse and Reset on BehaviorBoard-Main (BoardCommands, from its rig.yml entry, the piece's AsyncSubject), as Harp writes multicast into the board piece's own Commands subject: no device is opened here.</Description>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>BehaviorBoard-Main</Name>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>ControlEvents</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="orcl:OnCommand">
+                <orcl:Name>Pulse</orcl:Name>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="SubscribeSubject">
+              <Name>ControlEvents</Name>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="orcl:OnCommand">
+                <orcl:Name>Reset</orcl:Name>
+              </Combinator>
+            </Expression>
+            <Expression xsi:type="Combinator">
+              <Combinator xsi:type="p1:BoardCommands" />
+            </Expression>
+            <Expression xsi:type="MulticastSubject">
+              <Name>BehaviorBoard-Main.Commands</Name>
+            </Expression>
+          </Nodes>
+          <Edges>
+            <Edge From="0" To="5" Label="Source1" />
+            <Edge From="1" To="2" Label="Source1" />
+            <Edge From="2" To="5" Label="Source2" />
+            <Edge From="3" To="4" Label="Source1" />
+            <Edge From="4" To="5" Label="Source3" />
+            <Edge From="5" To="6" Label="Source1" />
+          </Edges>
+        </Workflow>
+      </Expression>
+      <Expression xsi:type="lv:StreamDevices">
+        <Name>LiveView</Name>
+        <Description>Streams every rig.yml device the pieces publish (their &lt;Device&gt;.Data) to rig-control's live view (OpenRigs.LiveView): data on TCP 5556, video on 5558. No experiment folder, so the session key stays ready. Last in the workflow: it finds only subjects built before it.</Description>
+        <lv:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</lv:ConfigRoot>
+        <lv:DataPort>5556</lv:DataPort>
+        <lv:VideoPort>5558</lv:VideoPort>
+      </Expression>
+    </Nodes>
+    <Edges>
+      <Edge From="0" To="1" Label="Source1" />
+      <Edge From="3" To="4" Label="Source1" />
+      <Edge From="6" To="7" Label="Source1" />
+    </Edges>
+  </Workflow>
+</WorkflowBuilder>
