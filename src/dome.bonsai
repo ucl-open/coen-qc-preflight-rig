@@ -58,11 +58,17 @@
           </Edges>
         </Workflow>
       </Expression>
+      <Expression xsi:type="ExternalizedMapping">
+        <Property Name="DisplayDevice" DisplayName="DisplayDevice" Description="The display the dome projector is on (DomeHardware's ProjectorDisplay); a launch property, as in the dome tasks. First by default, the display the lab's dome windows open on." />
+      </Expression>
       <Expression xsi:type="GroupWorkflow">
         <Name>Hardware</Name>
         <Description>The domes' rig list (OpenRigs.Devices DomeHardware), as in every dome task: each piece from its rig.yml entry, opened and readied, Ready from its ReadyGate; and the board's ManualPulses (Pulse and Reset).</Description>
         <Workflow>
           <Nodes>
+            <Expression xsi:type="ExternalizedMapping">
+              <Property Name="DisplayDevice" />
+            </Expression>
             <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:DomeHardware.bonsai">
               <DisplayDevice>First</DisplayDevice>
             </Expression>
@@ -71,7 +77,9 @@
               <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
             </Expression>
           </Nodes>
-          <Edges />
+          <Edges>
+            <Edge From="0" To="1" Label="Source1" />
+          </Edges>
         </Workflow>
       </Expression>
       <Expression xsi:type="ExternalizedMapping">
@@ -493,7 +501,8 @@
     <Edges>
       <Edge From="0" To="1" Label="Source1" />
       <Edge From="3" To="4" Label="Source1" />
-      <Edge From="6" To="7" Label="Source1" />
+      <Edge From="5" To="6" Label="Source1" />
+      <Edge From="7" To="8" Label="Source1" />
     </Edges>
   </Workflow>
 </WorkflowBuilder>

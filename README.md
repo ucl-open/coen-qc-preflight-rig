@@ -21,6 +21,7 @@ scripts\deploy.ps1          # Bonsai and its packages into .bonsai\, as rig-setu
 uv run coen-qc-preflight-rig plan <rig.yml>
 uv run coen-qc-preflight-rig judge <rig.yml> <raw.csv> <out.json> --rig <RIG>   # dated by the raw file; the check's version is the last commit to src or config, as rig-control reads it
 .bonsai\Bonsai.exe src\box.bonsai --no-editor --property:ConfigRoot=<dir> --property:RawFile=<csv> --property:TaskPath=config\task-box.yml --property:SubjectId=test --property:SessionId=001
+# src\dome.bonsai takes the same with config\task-dome.yml, and --property:DisplayDevice=<display> for a dome whose projector is not Windows' first display (First by default)
 uv run --project <rig-control> rig-control status|go|command|stop localhost --port 5561   # drive it with no agent
 ```
 
