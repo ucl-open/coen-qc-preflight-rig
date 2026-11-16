@@ -1,4 +1,4 @@
-# The domes' preflight (src\main.bonsai): app-rig-control launches it, with this file, on a rig whose rig.yml has a
+# The domes' preflight (src\dome.bonsai): app-rig-control launches it, with this file, on a rig whose rig.yml has a
 # projectionCalibration, and writes it at Go; OpenRigs.Devices PreflightChecks reads it (ReadPreflightTask).
 countSeconds: 5  # each device counted this long after Go
 questions:       # asked of the person, by rig.yml kind, after the counts

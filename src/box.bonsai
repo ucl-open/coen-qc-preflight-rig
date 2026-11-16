@@ -7,11 +7,11 @@
                  xmlns:orcl="clr-namespace:OpenRigs.Control;assembly=OpenRigs.Control"
                  xmlns:lv="clr-namespace:OpenRigs.LiveView;assembly=OpenRigs.LiveView"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The behaviour boxes' preflight, run from rig-control's Preflight page and card as the test mouse: the boxes' rig list (OpenRigs.Devices BBoxHardware) opens and readies every device as the box task does, no experiment folder (NoExperimentFolder), and the lab's check (OpenRigs.Devices PreflightChecks) counts each rig.yml device from its piece's data (Taps) and, from Go, writes the raw rows to RawFile with the questions of TaskPath (config\task-box.yml). A device that fails as it opens stops the preflight naming it, as it stops the task. Commands Pulse and Reset on BehaviorBoard-Main, written into the board piece's own command subject (Commands). coen_qc_preflight_rig.judge applies the thresholds.</Description>
+  <Description>The behaviour boxes' preflight, run from rig-control's Preflight page and card as the test mouse: the boxes' rig list (OpenRigs.Devices BBoxHardware) opens and readies every device as the box task does, no experiment folder (NoExperimentFolder), and the lab's check (OpenRigs.Devices PreflightChecks) counts each rig.yml device from its piece's data (Taps) and, from Go, writes the raw rows to RawFile with the questions of TaskPath (config\task-box.yml). A device that fails as it opens stops the preflight naming it, as it stops the task. Pulse and Reset on BehaviorBoard-Main are the board's ManualPulses piece. coen_qc_preflight_rig.judge applies the thresholds.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="ConfigRoot" Description="The folder holding &lt;MACHINE&gt;\rig.yml; a launch property." />
+        <Property Name="ConfigRoot" Description="The folder holding &lt;MACHINE&gt;\rig.yml, read by ReadLabRig; a launch property. LiveView keeps its own ConfigRoot: an edge into it makes Bonsai build it before the pieces, and it then streams nothing." />
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
         <ConfigRoot>C:\Coen-Lab-Local\RigConfigs</ConfigRoot>
@@ -25,7 +25,7 @@
       </Expression>
       <Expression xsi:type="GroupWorkflow">
         <Name>Initialization</Name>
-        <Description>The experiment controller (OpenRigs.Control, ExperimentControl, TCP 5561 on this machine): commands Pulse and Reset (Confirm is PreflightChecks'). EndAfterStop ends headless Bonsai when it is still running 2 s after the controller's stop.</Description>
+        <Description>The experiment controller (OpenRigs.Control, ExperimentControl, TCP 5561 on this machine), with no commands of its own: Pulse and Reset are the board's ManualPulses' and Confirm is PreflightChecks'. EndAfterStop ends headless Bonsai when it is still running 2 s after the controller's stop.</Description>
         <Workflow>
           <Nodes>
             <Expression xsi:type="ExternalizedMapping">
@@ -37,16 +37,7 @@
               <SessionId />
               <ControlEndpoint>@tcp://127.0.0.1:5561</ControlEndpoint>
               <Parameters />
-              <Commands>
-                <Command>
-                  <Name>Pulse</Name>
-                  <Description>One pulse on a behaviour board line: the text is the board and line, such as BehaviorBoard-Main DO1. Its length is the line's pulseWidthMs in rig.yml, else 50 ms, or a width in ms given third, 1 to 60000 (BehaviorBoard-Main DO1 10000: rig-control's Flush, a valve open 10 s). On DO1 to DO3 the board times it, so it ends even if the workflow stops. Never on a CameraTrigger or ZapitTrigger line.</Description>
-                </Command>
-                <Command>
-                  <Name>Reset</Name>
-                  <Description>The behaviour board put back as an experiment expects it: each DO line not a camera trigger closed now (a Flush too), each fixed line's PulseDO width and the pulsed lines as rig.yml has them. The text is empty, or the board's name. rig-control's End Testing sends it before the stop.</Description>
-                </Command>
-              </Commands>
+              <Commands />
             </Expression>
             <Expression xsi:type="Combinator">
               <Description>Ends headless Bonsai when it is still running 2 s after the controller's stop: the live view's publisher threads keep the process alive until every device's teardown reaches them, and one held up kept Bonsai running until the agent's kill 30 s after End Testing (GREEN-DOME-2, 15 Nov 2026). Nothing in the editor.</Description>
@@ -60,7 +51,20 @@
           </Edges>
         </Workflow>
       </Expression>
-      <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BBoxHardware.bonsai" />
+      <Expression xsi:type="GroupWorkflow">
+        <Name>Hardware</Name>
+        <Description>The behaviour boxes' rig list (OpenRigs.Devices BBoxHardware), as in the box task: each piece from its rig.yml entry, opened and readied, Ready from its ReadyGate; and the board's ManualPulses (Pulse and Reset).</Description>
+        <Workflow>
+          <Nodes>
+            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BBoxHardware.bonsai" />
+            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.ManualPulses.bonsai">
+              <Board>BehaviorBoard-Main</Board>
+              <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
+            </Expression>
+          </Nodes>
+          <Edges />
+        </Workflow>
+      </Expression>
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="RawFile" Description="Where the raw rows go; a launch property." />
         <Property Name="TaskPath" Description="The task file app-rig-control writes at Go: config\task-box.yml with the form's edits." />
@@ -102,47 +106,6 @@
             <Edge From="1" To="2" Label="Source1" />
             <Edge From="3" To="4" Label="Source1" />
             <Edge From="4" To="5" Label="Source1" />
-          </Edges>
-        </Workflow>
-      </Expression>
-      <Expression xsi:type="GroupWorkflow">
-        <Name>Commands</Name>
-        <Description>A person's Pulse and Reset on BehaviorBoard-Main (BoardCommands, from its rig.yml entry, the piece's AsyncSubject), as Harp writes multicast into the board piece's own Commands subject: no device is opened here.</Description>
-        <Workflow>
-          <Nodes>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>BehaviorBoard-Main</Name>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>ControlEvents</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="orcl:OnCommand">
-                <orcl:Name>Pulse</orcl:Name>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="SubscribeSubject">
-              <Name>ControlEvents</Name>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="orcl:OnCommand">
-                <orcl:Name>Reset</orcl:Name>
-              </Combinator>
-            </Expression>
-            <Expression xsi:type="Combinator">
-              <Combinator xsi:type="p1:BoardCommands" />
-            </Expression>
-            <Expression xsi:type="MulticastSubject">
-              <Name>BehaviorBoard-Main.Commands</Name>
-            </Expression>
-          </Nodes>
-          <Edges>
-            <Edge From="0" To="5" Label="Source1" />
-            <Edge From="1" To="2" Label="Source1" />
-            <Edge From="2" To="5" Label="Source2" />
-            <Edge From="3" To="4" Label="Source1" />
-            <Edge From="4" To="5" Label="Source3" />
-            <Edge From="5" To="6" Label="Source1" />
           </Edges>
         </Workflow>
       </Expression>

@@ -1,7 +1,7 @@
 # The checks run before a push (README), on every push to main, as far as CI can run them: the Python tests, Bonsai
 # set up as a rig sets it up (.bonsai\Setup.ps1: Bonsai and every package restored), src\Extensions compiled under
-# C# 5 (the language Bonsai compiles it with) and src\main.bonsai parsed. The full build check (main.bonsai built with
-# Bonsai's builders, its ExperimentControl names, its layout) is app-rig-setup's workflows\check-workflow-builds.ps1,
+# C# 5 (the language Bonsai compiles it with) and each workflow parsed. The full build check (each built with
+# Bonsai's builders, its ExperimentControl names) is app-rig-setup's workflows\check-workflow-builds.ps1,
 # in a private repository: run it before pushing.
 
 name: Checks
@@ -48,5 +48,5 @@ jobs:
       - name: Each workflow parses
         shell: pwsh
         run: |
-          uv run --no-project python -c "import xml.etree.ElementTree as ET; [print(ET.parse(f) and f, 'parses') for f in ('src/main.bonsai', 'src/box.bonsai')]"
+          uv run --no-project python -c "import xml.etree.ElementTree as ET; [print(ET.parse(f) and f, 'parses') for f in ('src/dome.bonsai', 'src/box.bonsai')]"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
