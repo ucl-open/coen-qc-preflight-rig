@@ -1,7 +1,7 @@
 # Checks BoardCommands' Pulse and Reset (src\Extensions\Preflight.cs) without the rig: the writes it puts into the
-# board piece's Commands subject. A DO line's pulse is timed by the board (its PulseDO width, the line added to
-# rig.yml's pulsed lines, OutputSet, never a clear from the PC), so a Flush stopped mid-way still ends; a CameraTrigger
-# line is never pulsed. Build the extension first:
+# board piece's Commands subject. Every pulse, DO and DOPort, is timed by the board (its PulseDO or PulseDOPort width,
+# the line added to rig.yml's pulsed lines, OutputSet, never a clear from the PC), so a pulse stopped mid-way still
+# ends with its line low (checked against a model of the board); a CameraTrigger line is never pulsed. Build the extension first:
 #   dotnet build src\Extensions.csproj -p:LangVersion=5 -o %TEMP%\pf-ext-build
 # Exit 0 when every check passes.
 $ErrorActionPreference = 'Stop'
@@ -36,10 +36,16 @@ function Board([string]$enabled = 'DO1, DO2, DO3') {
     [Activator]::CreateInstance($named, @('BehaviorBoard-Main', $board))
 }
 
-# Each write the board gets for these commands, as "address=value", with the time the run took.
-function Run([string[]]$pulses, [string[]]$resets = @(), [string]$enabled = 'DO1, DO2, DO3') {
+# Each write the board gets for these commands, as "address=value", with the time the run took; with $stopMs, the
+# workflow stopped (the subscription disposed) that long after the commands.
+function Run([string[]]$pulses, [string[]]$resets = @(), [string]$enabled = 'DO1, DO2, DO3', [int]$stopMs = 0) {
     $entries = [Array]::CreateInstance($named, 1); $entries[0] = Board $enabled
     $source = ([Activator]::CreateInstance($commands)).Process((Of $named $entries), (Of ([string]) ([string[]]$pulses)), (Of ([string]) ([string[]]$resets)))
+    if ($stopMs) {
+        $timer = $rx.GetMethod('Timer', [Type[]]@([TimeSpan])).Invoke($null, @([TimeSpan]::FromMilliseconds($stopMs)))
+        $until = $rx.GetMethods() | Where-Object { $_.Name -eq 'TakeUntil' -and $_.GetParameters().Count -eq 2 -and $_.GetParameters()[1].ParameterType.Name -eq 'IObservable`1' } | Select-Object -First 1
+        $source = $until.MakeGenericMethod($message, [long]).Invoke($null, @($source, $timer))
+    }
     $clock = [Diagnostics.Stopwatch]::StartNew()
     $out = @(($rx.GetMethods() | Where-Object { $_.Name -eq 'ToEnumerable' })[0].MakeGenericMethod($message).Invoke($null, @($source)))
     [pscustomobject]@{ Writes = (@($out | ForEach-Object { "$($_.Address)=$($_.GetPayloadUInt16())" }) -join ' '); Ms = $clock.ElapsedMilliseconds }
@@ -60,11 +66,35 @@ Check "the CameraTrigger line is never pulsed ($($r.Writes))" ($r.Writes -eq '')
 # Reset (Pip, 11 Nov 2026: "End test should reset values and close"): every DO line but the camera trigger closed,
 # rig.yml's widths and pulsed lines back.
 $r = Run @() @('')
-Check "Reset: DO1-3 closed, DO0 left to the camera trigger, widths and pulsed lines as rig.yml ($($r.Writes))" ($r.Writes -eq '35=14336 57=40 58=45 59=3000 45=14336')
+Check "Reset: DO1-3 and DOPort0-2 closed, DO0 left to the camera trigger, widths and pulsed lines as rig.yml ($($r.Writes))" ($r.Writes -eq '35=14343 57=40 58=45 59=3000 45=14336')
 $r = Run @() @('Other-Board')
 Check "Reset for another board writes nothing here ($($r.Writes))" ($r.Writes -eq '')
 $r = Run @('BehaviorBoard-Main DOPort0 30')
-Check "DOPort: set, then cleared from here ($($r.Writes))" ($r.Writes -eq '34=1 35=1')
+Check "DOPort: timed by the board as a DO line is, no clear from here ($($r.Writes))" ($r.Writes -eq '46=30 45=14337 34=1')
+Check "PulseDOPort0 is Harp.Behavior's register 46" ([int](TypeOf 'Harp.Behavior.PulseDOPort0').GetField('Address').GetValue($null) -eq 46)
+
+# The lines still high once the board has done what it was told: OutputSet raises a line, OutputClear lowers it, and
+# a line raised while pulse-enabled with a width is lowered by the board itself.
+function HighAfter([string]$writes) {
+    $high = 0; $enabled = 0; $widths = @{}
+    foreach ($w in ($writes -split ' ' | Where-Object { $_ })) {
+        $a, $v = [int[]]($w -split '=')
+        if ($a -eq 34) {
+            $timed = 0; foreach ($k in $widths.Keys) { if ($widths[$k] -gt 0) { $timed = $timed -bor $k } }
+            $high = $high -bor ($v -band -bnot ($enabled -band $timed))
+        }
+        elseif ($a -eq 35) { $high = $high -band -bnot $v }
+        elseif ($a -eq 45) { $enabled = $v }
+        elseif ($a -ge 46 -and $a -le 48) { $widths[1 -shl ($a - 46)] = $v }
+        elseif ($a -ge 56 -and $a -le 59) { $widths[0x400 -shl ($a - 56)] = $v }
+    }
+    $high
+}
+# Stopped mid-pulse (End Testing, or EndAfterStop), every line the preflight raised ends low.
+foreach ($line in 'DOPort0', 'DOPort2', 'DO1', 'DO3') {
+    $r = Run @("BehaviorBoard-Main $line 500") -stopMs 100
+    Check "a stop 100 ms into a 500 ms $line pulse leaves no line high ($($r.Writes))" ((HighAfter $r.Writes) -eq 0)
+}
 foreach ($bad in 'BehaviorBoard-Main DO1 99999', 'BehaviorBoard-Main DO1 0', 'BehaviorBoard-Main DO9', 'BehaviorBoard-Main', 'BehaviorBoard-Main DO1 10 x', 'Other-Board DO1 10000') {
     $r = Run @($bad)
     Check "'$bad' fires nothing" ($r.Writes -eq '')

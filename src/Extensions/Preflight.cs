@@ -40,12 +40,13 @@ static class Preflight
 
 /// <summary>
 /// A person's Pulse and Reset for one Behavior board, as Harp writes into the board piece's Commands subject. Pulse
-/// (Board Line [ms], such as BehaviorBoard-Main DO1 or BehaviorBoard-Main DO1 10000, rig-control's Flush): DO1 to DO3
-/// timed by the board (its PulseDO width, the line added to the pulsed lines, OutputSet), so a pulse ends even if the
-/// workflow stops; DOPort0 to DOPort2 set and cleared from here. Its width: given, 1 to 60000 ms, else the line's
-/// pulseWidthMs in rig.yml, else 50 ms. Never on a line wiring gives a CameraTrigger or the ZapitTrigger (the pieces
-/// drive those). Reset (empty, or the board's name; rig-control's End Testing, before its stop): each DO line not a
-/// camera trigger cleared, each fixed line's PulseDO width and the pulsed lines as rig.yml has them.
+/// (Board Line [ms], such as BehaviorBoard-Main DO1 or BehaviorBoard-Main DO1 10000, rig-control's Flush): every line,
+/// DO0 to DO3 and DOPort0 to DOPort2, timed by the board (its PulseDO or PulseDOPort width, the line added to the
+/// pulsed lines, OutputSet), never cleared from here, so a pulse ends however the workflow stops. Its width: given,
+/// 1 to 60000 ms, else the line's pulseWidthMs in rig.yml, else 50 ms. Never on a line wiring gives a CameraTrigger or
+/// the ZapitTrigger (the pieces drive those). Reset (empty, or the board's name; rig-control's End Testing, before its
+/// stop): each DO and DOPort line not a camera trigger cleared, each fixed line's PulseDO width and the pulsed lines as
+/// rig.yml has them.
 /// </summary>
 [Combinator]
 [WorkflowElementCategory(ElementCategory.Combinator)]
@@ -55,8 +56,10 @@ public class BoardCommands
     const int OutputSet = 34;
     const int OutputClear = 35;
     const int OutputPulseEnable = 45;
+    const int PulseDOPort0 = 46;
     const int PulseDO0 = 56;
-    const ushort DoLines = 0x3C00;
+    // DOPort0-2 and DO0-3: every line a Pulse may raise.
+    const ushort OutputLines = 0x3C07;
 
     /// <summary>The writes for each Pulse and Reset naming this board.</summary>
     public IObservable<HarpMessage> Process(IObservable<NamedDevice<BehaviorBoard>> board, IObservable<string> pulses, IObservable<string> resets)
@@ -65,11 +68,7 @@ public class BoardCommands
         {
             var lines = new Lines(entry);
             ushort pulsedHere = 0;
-            var pulsed = pulses.SelectMany(text =>
-            {
-                var writes = lines.Pulse(text, ref pulsedHere);
-                return writes.ToObservable(ImmediateScheduler.Instance).Concat(lines.Clear(text));
-            });
+            var pulsed = pulses.SelectMany(text => lines.Pulse(text, ref pulsedHere).ToObservable(ImmediateScheduler.Instance));
             return pulsed.Merge(resets.SelectMany(text => lines.Reset(text).ToObservable(ImmediateScheduler.Instance)));
         });
     }
@@ -120,26 +119,12 @@ public class BoardCommands
                 int width;
                 ms = widths.TryGetValue(parts[1], out width) ? width : 50;
             }
-            if (mask >= 0x400)
-            {
-                pulsedHere |= mask;
-                writes.Add(HarpMessage.FromUInt16(PulseDO0 + Line(mask), MessageType.Write, Width(ms)));
-                writes.Add(HarpMessage.FromUInt16(OutputPulseEnable, MessageType.Write, (ushort)(pulsed | pulsedHere)));
-            }
+            // The board times every pulse, so a stop, an error or EndAfterStop never leaves a line high (a valve open).
+            pulsedHere |= mask;
+            writes.Add(HarpMessage.FromUInt16(PulseRegister(mask), MessageType.Write, Width(ms)));
+            writes.Add(HarpMessage.FromUInt16(OutputPulseEnable, MessageType.Write, (ushort)(pulsed | pulsedHere)));
             writes.Add(HarpMessage.FromUInt16(OutputSet, MessageType.Write, mask));
             return writes;
-        }
-
-        // A DOPort line has no pulse register: cleared from here after its width.
-        public IObservable<HarpMessage> Clear(string text)
-        {
-            var parts = Preflight.Words(text);
-            var mask = parts.Length >= 2 && parts[0] == name ? Preflight.Mask(parts[1]) : (ushort)0;
-            if (mask == 0 || mask >= 0x400) return Observable.Empty<HarpMessage>();
-            double ms = 50;
-            if (parts.Length == 3 && !(double.TryParse(parts[2], NumberStyles.Float, Preflight.Invariant, out ms) && ms >= 1 && ms <= 60000))
-                return Observable.Empty<HarpMessage>();
-            return Observable.Timer(TimeSpan.FromMilliseconds(ms)).Select(_ => HarpMessage.FromUInt16(OutputClear, MessageType.Write, mask));
         }
 
         public List<HarpMessage> Reset(string text)
@@ -147,10 +132,10 @@ public class BoardCommands
             var writes = new List<HarpMessage>();
             var named = (text ?? string.Empty).Trim();
             if (named.Length > 0 && named != name) return writes;
-            writes.Add(HarpMessage.FromUInt16(OutputClear, MessageType.Write, (ushort)(DoLines & ~cameras)));
-            foreach (var pair in widths) writes.Add(HarpMessage.FromUInt16(PulseDO0 + Line(Preflight.Mask(pair.Key)), MessageType.Write, Width(pair.Value)));
+            writes.Add(HarpMessage.FromUInt16(OutputClear, MessageType.Write, (ushort)(OutputLines & ~cameras)));
+            foreach (var pair in widths) writes.Add(HarpMessage.FromUInt16(PulseRegister(Preflight.Mask(pair.Key)), MessageType.Write, Width(pair.Value)));
             writes.Add(HarpMessage.FromUInt16(OutputPulseEnable, MessageType.Write, pulsed));
-            Console.Error.WriteLine("preflight: " + name + " reset: DO lines closed, pulse widths and pulsed lines as rig.yml has them");
+            Console.Error.WriteLine("preflight: " + name + " reset: DO and DOPort lines closed, pulse widths and pulsed lines as rig.yml has them");
             return writes;
         }
 
@@ -160,11 +145,13 @@ public class BoardCommands
             return writes;
         }
 
-        static int Line(ushort mask)
+        // PulseDOPort0-2 (46-48) for DOPort0-2, PulseDO0-3 (56-59) for DO0-3.
+        static int PulseRegister(ushort mask)
         {
+            var first = mask >= 0x400 ? 0x400 : 1;
             var n = 0;
-            while ((0x400 << n) != mask) n++;
-            return n;
+            while ((first << n) != mask) n++;
+            return (mask >= 0x400 ? PulseDO0 : PulseDOPort0) + n;
         }
 
         static ushort Width(double ms)
