@@ -20,3 +20,8 @@ History is in `git log`.
 ## Not recommended
 
 - No task-file schemas in preflight: the repo tests (`tests\test_preflight.py`, `tests\test_workflow.py`) already hold the keys.
+
+## Audit round 5 (17 Nov 2026): not recommended
+
+- task-dome.yml and task-bbox.yml as Preflight configs: they use the task-file mechanism.
+- SpeakerArray as a Preflight row: it matches its rig.yml key.
