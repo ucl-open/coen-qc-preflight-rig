@@ -1,30 +1,31 @@
-# The lab rig model (lib-open-rigs open_rigs.rigs.lab_rig LabRig). Each device sits under its kind by name: the
-# box drives behaviorBoard: main: (BehaviorBoard-Main in the data) and camera: overhead: (Camera-Overhead), and
-# stops at startup if either is missing. The camera's trigger and frame rate are the board's camera trigger its
-# wiring line names it on (DO0, trigger0Frequency).
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Coen-Lab/lib-open-rigs/main/src/open_rigs/schemas/lab_rig.json
+# BBOX-1, in the lab rig model (lib-open-rigs open_rigs.rigs.lab_rig, laid out as its rig-template.yml).
+# The bbox drives behaviorBoard: main: (BehaviorBoard-Main in the data) and camera: overhead:
+# (Camera-Overhead), and stops at startup if either is missing. The camera's trigger and frame rate are
+# the board's camera trigger its wiring line names it on (DO0, trigger0Frequency).
+rootPath: C:\Coen-Lab-Local\Acquired-Data
+rigId: S1                 # app-rig-control's session numbering (S for the bboxes)
+
 behaviorBoard:
   main:
-    cameraTriggerController:
-      trigger0Frequency: 50
-      trigger1Frequency: 50
     portName: COM3
-    usbSerial: 'AB0M7PLB'
-    pulseController: null
-    runningWheel:
-      countsPerRev: 4096
-      wheelDiameterMm: 150.0
+    usbSerial: "AB0M7PLB"
     wiring:
       DO0: { device: CameraTrigger, targets: [Camera-Overhead] }
+    cameraTriggerController:
+      trigger0Frequency: 50     # Hz
+      trigger1Frequency: 50     # Hz, used only if trigger 1 is enabled
+    runningWheel:
+      wheelDiameterMm: 150
+      countsPerRev: 4096
+
 camera:
   overhead:
+    serialNumber: "23201539"
+    exposureUs: 3000
+    gainDb: 1
     binning: 1
-    discriminatorType: SpinnakerCamera
-    exposureTime: 3000.0
-    gain: 1.0
-    serialNumber: '23201539'
     pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
-rigId: S1  # S for behaviour box; B1 until 14 Nov 2026
-rootPath: C:\Coen-Lab-Local\Acquired-Data
 
 # Every camera's video is encoded on the Intel GPU (Quick Sync).
 videoEncoder:

@@ -21,7 +21,7 @@ def main(argv: list[str] | None = None) -> int:
     sj.add_argument("out", type=Path)
     sj.add_argument("--rig", required=True)
     sj.add_argument("--commit", default=None,
-                    help="the check's version; by default the last commit that changed src or config, as rig-control reads it")
+                    help="the check's version; by default the last commit that changed src or config, as app-rig-control reads it")
     sj.add_argument("--thresholds", type=Path, default=THRESHOLDS)
     a = p.parse_args(argv)
     if a.cmd == "plan":

@@ -10,14 +10,14 @@
                  xmlns:dsp="clr-namespace:Bonsai.Dsp;assembly=Bonsai.Dsp"
                  xmlns:scr="clr-namespace:Bonsai.Scripting.Expressions;assembly=Bonsai.Scripting.Expressions"
                  xmlns="https://bonsai-rx.org/2018/workflow">
-  <Description>The domes' preflight, run from rig-control's Preflight page and card as the test mouse: the domes' rig list (OpenRigs.Devices DomeHardware) opens and readies every device as a task does, no experiment folder (NoExperimentFolder), and the lab's check (OpenRigs.Devices PreflightChecks) counts each rig.yml device from its piece's data (the rig list's taps, OpenRigs.Devices DomeHardwareTaps) and, from Go, writes the raw rows to RawFile with the questions of TaskPath (config\task-dome.yml). A device that fails as it opens stops the preflight naming it, as it stops a task. Pulse and Reset on BehaviorBoard-Main are the board's ManualPulses piece; the spouts move by the lick spout stage's own commands. Each rig.yml speaker plays a test sound while its question is asked (SpeakerTest), and the projector shows a test pattern (TestPattern). coen_qc_preflight_rig.judge applies the thresholds.</Description>
+  <Description>The domes' preflight, run from app-rig-control's Preflight page and card as the test mouse: the domes' rig list (OpenRigs.Devices DomeHardware) opens and readies every device as a task does, no experiment folder (NoExperimentFolder), and the lab's check (OpenRigs.Devices PreflightChecks) counts each rig.yml device from its piece's data (the rig list's taps, OpenRigs.Devices DomeHardwareTaps) and, from Go, writes the raw rows to RawFile with the questions of TaskPath (config\task-dome.yml). A device that fails as it opens stops the preflight naming it, as it stops a task. Pulse and Reset on BehaviorBoard-Main are the board's ManualPulses piece; the spouts move by the lick spout stage's own commands. Each rig.yml speaker plays a test sound while its question is asked (SpeakerTest), and the projector shows a test pattern (TestPattern). coen_qc_preflight_rig.judge applies the thresholds.</Description>
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="ConfigRoot" Description="The folder holding &lt;MACHINE&gt;\rig.yml, read by ReadLabRig; a launch property. LiveView keeps its own ConfigRoot: an edge into it makes Bonsai build it before the pieces, and it then streams nothing." />
+        <Property Name="ConfigRoot" Description="The folder holding &lt;RIG&gt;\rig.yml, read by ReadLabRig; a launch property. LiveView keeps its own ConfigRoot: an edge into it makes Bonsai build it before the pieces, and it then streams nothing." />
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
-        <Description>This machine's rig.yml (ConfigRoot\MACHINE\rig.yml) read once into the lab rig model: RigConfigs, RigFile, RigConfigDirectory and ConfigRoot, which every device piece reads. First, before anything that reads them.</Description>
+        <Description>This machine's rig.yml (ConfigRoot\&lt;RIG&gt;\rig.yml) read once into the lab rig model: RigConfigs, RigFile and ConfigRoot, which every device piece reads. First, before anything that reads them.</Description>
         <ConfigRoot>C:\Coen-Lab-Local\RigConfigs</ConfigRoot>
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Logging:NoExperimentFolder.bonsai">
@@ -25,7 +25,7 @@
       <Expression xsi:type="ExternalizedMapping">
         <Property Name="SubjectId" />
         <Property Name="SessionId" />
-        <Property Name="LaunchId" Description="The launcher's run id; the launch's own, from rig-control." />
+        <Property Name="LaunchId" Description="The launcher's run id; the launch's own, from app-rig-control." />
       </Expression>
       <Expression xsi:type="GroupWorkflow">
         <Name>Initialization</Name>
@@ -71,7 +71,7 @@
             <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:DomeHardware.bonsai">
               <DisplayDevice>First</DisplayDevice>
             </Expression>
-            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:BehaviorBoard.ManualPulses.bonsai">
+            <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ManualPulses.bonsai">
               <Board>BehaviorBoard-Main</Board>
               <BoardCommandsSubjectName>BehaviorBoard-Main.Commands</BoardCommandsSubjectName>
             </Expression>
@@ -352,7 +352,7 @@
       </Expression>
       <Expression xsi:type="lv:StreamDevices">
         <Name>LiveView</Name>
-        <Description>Streams every rig.yml device the pieces publish (their &lt;Device&gt;.Data) to rig-control's live view (OpenRigs.LiveView): data on TCP 5556, video on 5558. No experiment folder, so the session key stays ready. Last in the workflow: it finds only subjects built before it.</Description>
+        <Description>Streams every rig.yml device the pieces publish (their &lt;Device&gt;.Data) to app-rig-control's live view (OpenRigs.LiveView): data on TCP 5556, video on 5558. No experiment folder, so the session key stays ready. Last in the workflow: it finds only subjects built before it.</Description>
         <lv:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</lv:ConfigRoot>
         <lv:DataPort>5556</lv:DataPort>
         <lv:VideoPort>5558</lv:VideoPort>

@@ -11,12 +11,12 @@ History is in `git log`.
 
 ## Decided
 
-- One workflow per rig kind on its rig list, no device opened by hand (Pip, 16 Nov 2026): `src\dome.bonsai` (`DomeHardware`, `config\task-dome.yml`) and `src\box.bonsai` (`BehaviorBoxHardware`, `config\task-box.yml`).
-- Pulse and Reset are lib's `BehaviorBoard.ManualPulses`; the spouts move by the lick spout stage's own commands.
+- One workflow per rig kind on its rig list, no device opened by hand (Pip, 16 Nov 2026): `src\dome.bonsai` (`DomeHardware`, `config\task-dome.yml`) and `src\bbox.bonsai` (`BBoxHardware`, `config\task-bbox.yml`).
+- Pulse and Reset are lib's `ManualPulses`; the spouts move by the lick spout stage's own commands.
 - Speakers: evidence plus person (Pip, 15 Nov 2026): each test sound sent to the mixer is counted, then the person confirms.
 - The raw rows go through OpenRigs.Logging's `CsvWriter`.
 - `.bonsai\Setup.ps1` is the same in every task repo: each repo needs its own bootstrap.
 
-## Audit round 1 (16 Nov 2026): not recommended
+## Not recommended
 
 - No task-file schemas in preflight: the repo tests (`tests\test_preflight.py`, `tests\test_workflow.py`) already hold the keys.

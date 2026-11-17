@@ -1,5 +1,5 @@
 """Each rig kind's preflight against the lab's rules for a workflow's hardware (open_rigs.rigs.workflow_lint): the domes'
-(src\\dome.bonsai, DomeHardware) and the behaviour boxes' (src\\box.bonsai, BehaviorBoxHardware), each its rig list, the lab's
+(src\\dome.bonsai, DomeHardware) and the behaviour boxes' (src\\bbox.bonsai, BBoxHardware), each its rig list, the lab's
 check (OpenRigs.Devices PreflightChecks) and its task file, never a device opened by hand (Pip, 16 Nov 2026)."""
 
 import xml.etree.ElementTree as ET
@@ -16,7 +16,7 @@ DOME = ["TimestampGeneratorGen3-Main", "BehaviorBoard-Main", "LicketySplit-Left"
 # Each workflow: its rig list, the devices it drives, its task file.
 KINDS = {
     "dome.bonsai": ("DomeHardware", DOME, "task-dome.yml"),
-    "box.bonsai": ("BehaviorBoxHardware", ["BehaviorBoard-Main", "Camera-Overhead"], "task-box.yml"),
+    "bbox.bonsai": ("BBoxHardware", ["BehaviorBoard-Main", "Camera-Overhead"], "task-bbox.yml"),
 }
 
 
@@ -39,8 +39,8 @@ def test_no_device_is_opened_by_hand(wf):
 
 
 def test_every_device_is_counted_by_the_rig_list_s_taps(wf):
-    # The rig list's taps include (DomeHardwareTaps, BehaviorBoxHardwareTaps) taps each piece's data, and the dome's
-    # projector frames, into DeviceTicks; this repo's own Taps group did until lib's taps includes (16 Nov 2026).
+    # The rig list's taps include (DomeHardwareTaps, BBoxHardwareTaps) taps each piece's data, and the dome's
+    # projector frames, into DeviceTicks.
     assert lint.preflight_tap_problems(wf) == []
     assert f'Path="{lint.DEVICES}{KINDS[wf.file][0]}Taps.bonsai"' in wf.text
 
@@ -114,11 +114,11 @@ def test_the_test_pattern_fills_the_projector_view():
 
 
 def test_pulse_and_reset_are_the_board_piece_s(wf):
-    # lib's BehaviorBoard.ManualPulses declares and writes them (every pulse timed by the board; its tests are lib's
+    # lib's ManualPulses declares and writes them (every pulse timed by the board; its tests are lib's
     # PulseCommandsTests), so neither preflight writes board registers by hand.
     nodes, _ = _top(wf)
     (hardware,) = [n for n in nodes if n.findtext(W + "Name") == "Hardware"]
-    assert ET.tostring(hardware, encoding="unicode").count('Path="OpenRigs.Devices:BehaviorBoard.ManualPulses.bonsai"') == 1
+    assert ET.tostring(hardware, encoding="unicode").count('Path="OpenRigs.Devices:ManualPulses.bonsai"') == 1
 
 def test_the_dome_s_display_is_a_launch_property():
     # DisplayDevice from the launch, mapped down to DomeHardware, as in the dome tasks and the projector calibration.

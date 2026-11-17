@@ -5,12 +5,12 @@
 # artefacts (valve curves and the like) go in calibration\ beside it, referenced by paths relative to it.
 #
 rootPath: C:\Coen-Lab-Local\Acquired-Data
-rigId: G1                 # two capitals or a capital and a digit: rig-control's session numbering (G for green; D1 until 14 Nov 2026)
+rigId: G1                 # two capitals or a capital and a digit: app-rig-control's session numbering (G for green)
 
 # Each kind of device is a group of named entries: behaviorBoard: main: is BehaviorBoard-Main in the
 # data and in live view. The workflow takes each device it drives by that name and stops at startup,
 # naming what this file has, if one is missing. usbSerial is the board's USB serial, an FTDI chip's
-# or a Pico's flash id (rig-setup's hardware scan lists each port's): RecordHarpDevices checks at
+# or a Pico's flash id (app-rig-setup's hardware scan lists each port's): RecordHarpDevices checks at
 # Start that the board on each portName has it, for every Harp board here, and stops the workflow
 # saying which board is where if not.
 behaviorBoard:
@@ -23,11 +23,12 @@ behaviorBoard:
       # on a valve calibration curve in calibration\). A fixed reward line delivers ceil(ul / 2)
       # pulses of its width, assuming 2 ul per pulse; a calibrated one delivers the requested volume.
       outputs:
-        DO1: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO1.json }   # left reward valve (was a fixed 50 ms)
-        DO2: { discriminatorType: CalibratedPulse, artefact: calibration/valve-DO2.json }   # right reward valve (was a fixed 45 ms)
+        DO1: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Left.json }   # left reward valve
+        DO2: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Right.json }   # right reward valve
         DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }   # ZapitTrigger line: held, not pulsed, so no width
     # What each line drives (lab rig model): one RewardValve per spout, named left and right, and the ZapitTrigger.
     wiring:
+      DIPort0: { device: Photodiode }
       DO0: { device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }
       DO1: { device: RewardValve, name: left }
       DO2: { device: RewardValve, name: right }
@@ -48,7 +49,7 @@ timestampGeneratorGen3:
     timerFrequency: Timer1000Hz
 
 # The lick spout stage's two Harp StepperDriver boards. wiring: names what each motor and input
-# is connected to (Pip, 11 Nov 2026); the workflows still drive the axes by these motor numbers.
+# is connected to.
 # stepInterval, microstepResolution and maximumRunCurrent are the values av-dome writes.
 stepperDriver:
   a:
@@ -91,26 +92,26 @@ licketySplit:
 camera:
   face:
     serialNumber: "23100954"
-    exposureTime: 19000    # microseconds
-    gain: 0
+    exposureUs: 19000    # microseconds
+    gainDb: 0
     binning: 1
     pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
   pupil:
     serialNumber: "23201536"
-    exposureTime: 19000    # microseconds
-    gain: 0
+    exposureUs: 19000    # microseconds
+    gainDb: 0
     binning: 1
     pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
   body:
     serialNumber: "23199184"
-    exposureTime: 19000    # microseconds
-    gain: 0
+    exposureUs: 19000    # microseconds
+    gainDb: 0
     binning: 1
     pixelFormat: Mono8     # stated: left out, a camera keeps the format stored on it
 
-projectionCalibration:
-  meshMapPath: calibration/MeshMap.csv
-  gammaLutPath: calibration/gammalut.bmp
+projector:
+  meshPath: calibration/Projector-Mesh.csv
+  gammaPath: calibration/Projector-Gamma.bmp
 
 speakerArray:
   device:
@@ -124,11 +125,11 @@ speakerArray:
   syncGain: 0.2
   penaltySoundChannel: 2    # the penalty sound's channel (the centre speaker, as GREEN-DOME-2's)
   unusedChannels: [30]      # not connected
+  penaltySound: ../shared/sounds/penalty_tone.wav
   backgroundNoise: ../shared/sounds/background_noise.wav   # the lab's one background noise (RigConfigs\shared, kept from the server's config\shared)
   # Speakers currently wired on this rig. Position is relative to the subject:
   # azimuth 0 = straight ahead, positive to the right; elevation 0 = horizontal.
-  # filter: the speaker's SpeakerFilter artefact (FIR taps), relative to this directory. The
-  # auditory stimuli are src\LocalFiles\AuditoryStimuli\filtered_pink_pulse_train_0..99.wav.
+  # filter: the speaker's SpeakerFilter artefact (FIR taps), relative to this directory.
   speakers:
     left:
       position: { azimuth: -90, elevation: 15 }
@@ -172,18 +173,18 @@ speakerArray:
   #   layer4_-120:   { position: { azimuth: -120,   elevation: -15 }, channel: 25 }
 
 # Zapit optogenetics server (tcpServer section of the Zapit settings file). Contacted only when the
-# task sets optogenetics.useZapit: true, so non-opto rigs can leave the defaults.
+# task has optogenetics on, so a rig without it can leave the defaults.
 zapit:
   host: 127.0.0.1         # PC running Zapit; 127.0.0.1 when Zapit runs on this rig PC
   port: 1488
   hardwareTriggered: false  # true once wiring's ZapitTrigger line is cabled to the Zapit DAQ trigger input
 # Default absolute stage position at session start (steps)
-lickSpoutDefaultPosition:   # mean of the two-spout mice on this rig, 16 Nov 2026
-  baseTransverse: 6150       # motor 1
-  leftRadial: 10100           # motor 2
-  rightRadial: 10300          # motor 3
-  leftElevation: 10900        # motor 4
-  rightElevation: 13400       # motor 5
+lickSpoutDefaultPosition:   # mean of the two-spout mice on this rig
+  baseTransverse: 6150
+  radialLeft: 10100
+  radialRight: 10300
+  elevationLeft: 10900
+  elevationRight: 13400
 
 # Every camera's video is encoded on the NVIDIA GPU (RTX 5060).
 videoEncoder:

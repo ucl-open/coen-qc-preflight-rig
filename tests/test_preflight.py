@@ -1,4 +1,4 @@
-"""The lab rig model on real rig.yml files (copied from K:\\config\\machines on 16 Nov 2026, every rig that has one), the plan, and the judge."""
+"""The lab rig model on real rig.yml files (each rig's K:\\config\\machines\\<RIG>\\rig.yml, every rig that has a complete one), the plan, and the judge."""
 
 from pathlib import Path
 
@@ -12,9 +12,9 @@ FIXTURES = Path(__file__).parent / "fixtures"
 THRESHOLDS = Path(__file__).parents[1] / "config" / "thresholds.yml"
 DOME = ["BehaviorBoard-Main", "TimestampGeneratorGen3-Main", "StepperDriver-A", "StepperDriver-B",
         "LicketySplit-Left", "LicketySplit-Right", "Camera-Face", "Camera-Pupil", "Camera-Body",
-        "SpeakerArray", "ProjectionCalibration"]
+        "SpeakerArray", "Projector"]
 DOMES = ["GREEN-DOME-1", "GREEN-DOME-2", "BLUE-OPTO-1", "BLUE-OPTO-2"]
-BOXES = ["BBOX-1"]  # BBOX-2's still has CHANGE-ME for its board and camera
+BBOXES = ["BBOX-1"]  # BBOX-2's still has CHANGE-ME for its board and camera
 
 
 @pytest.mark.parametrize("name", DOMES)
@@ -22,15 +22,15 @@ def test_a_dome_plans_every_device(name):
     assert [d.name for d in plan.plan(rig.load(FIXTURES / f"{name}.yml"))] == DOME
 
 
-@pytest.mark.parametrize("name", DOMES + BOXES)
+@pytest.mark.parametrize("name", DOMES + BBOXES)
 def test_a_fixture_is_a_valid_lab_rig(name):
     from open_rigs.rigs.lab_rig import LabRig
 
     LabRig.model_validate(yaml.safe_load((FIXTURES / f"{name}.yml").read_text(encoding="utf-8")))
 
 
-@pytest.mark.parametrize("name", BOXES)
-def test_a_box_plans_its_board_and_camera_only(name):
+@pytest.mark.parametrize("name", BBOXES)
+def test_a_bbox_plans_its_board_and_camera_only(name):
     assert [d.name for d in plan.plan(rig.load(FIXTURES / f"{name}.yml"))] == ["BehaviorBoard-Main", "Camera-Overhead"]
 
 
@@ -62,7 +62,7 @@ def _raw(tmp_path, rows):
     return f
 
 
-GOOD_BOX = [("BehaviorBoard-Main", "messages", "120", ""), ("BehaviorBoard-Main", "seconds", "5", ""),
+GOOD_BBOX = [("BehaviorBoard-Main", "messages", "120", ""), ("BehaviorBoard-Main", "seconds", "5", ""),
             ("Camera-Overhead", "frames", "250", ""), ("Camera-Overhead", "seconds", "5", "")]
 
 
@@ -70,25 +70,25 @@ def _judge(tmp_path, rows):
     return judge.judge(FIXTURES / "BBOX-1.yml", _raw(tmp_path, rows), THRESHOLDS, "BBOX-1", "abc")
 
 
-def test_a_box_that_works_passes(tmp_path):
-    record = _judge(tmp_path, GOOD_BOX)
+def test_a_bbox_that_works_passes(tmp_path):
+    record = _judge(tmp_path, GOOD_BBOX)
     assert record["passed"], record
     assert record["rigYmlSha256"] and record["checkCommit"] == "abc"
 
 
 def test_a_device_that_did_not_open_fails_with_its_message(tmp_path):
-    rows = GOOD_BOX[:2] + [("Camera-Overhead", "error", "", "The camera 23201539 was not found")]
+    rows = GOOD_BBOX[:2] + [("Camera-Overhead", "error", "", "The camera 23201539 was not found")]
     record = _judge(tmp_path, rows)
     assert not record["passed"]
     assert record["devices"][1] == {"device": "Camera-Overhead", "ok": False, "why": "The camera 23201539 was not found"}
 
 
 def test_a_device_that_did_not_report_fails(tmp_path):
-    assert _judge(tmp_path, GOOD_BOX[:2])["devices"][1]["why"] == "did not report"
+    assert _judge(tmp_path, GOOD_BBOX[:2])["devices"][1]["why"] == "did not report"
 
 
 def test_a_slow_camera_fails(tmp_path):
-    rows = GOOD_BOX[:2] + [("Camera-Overhead", "frames", "200", ""), ("Camera-Overhead", "seconds", "5", "")]
+    rows = GOOD_BBOX[:2] + [("Camera-Overhead", "frames", "200", ""), ("Camera-Overhead", "seconds", "5", "")]
     assert _judge(tmp_path, rows)["devices"][1]["why"] == "40.0 frames/s, 49.0 needed"
 
 
@@ -100,13 +100,13 @@ def test_a_camera_is_judged_by_the_trigger_its_wiring_line_names(tmp_path):
     board["cameraTriggerController"].update(trigger0Enabled=False, trigger1Enabled=True, trigger1Frequency=30)
     f = tmp_path / "rig.yml"
     f.write_text(yaml.safe_dump(data), encoding="utf-8")
-    rows = GOOD_BOX[:2] + [("Camera-Overhead", "frames", "150", ""), ("Camera-Overhead", "seconds", "5", "")]
+    rows = GOOD_BBOX[:2] + [("Camera-Overhead", "frames", "150", ""), ("Camera-Overhead", "seconds", "5", "")]
     record = judge.judge(f, _raw(tmp_path, rows), THRESHOLDS, "BBOX-1", "abc")
     assert record["passed"], record
 
 
 def test_a_device_rig_yml_does_not_declare_fails(tmp_path):
-    record = _judge(tmp_path, GOOD_BOX + [("StepperDriver-A", "messages", "5", "")])
+    record = _judge(tmp_path, GOOD_BBOX + [("StepperDriver-A", "messages", "5", "")])
     assert not record["passed"]
     assert record["devices"][-1]["why"] == "checked, but rig.yml does not declare it"
 
@@ -118,7 +118,7 @@ def _dome(tmp_path, projection, person="1", sounds=SOUNDS):
     rows = [(d, "messages", "9", "") for d in DOME[:6]] + \
            [(d, m, v, "") for d in DOME[6:9] for m, v in (("frames", "250"), ("seconds", "5"))] + \
            [("SpeakerArray", f"sounds:{s}", n, "") for s, n in sounds.items()] + [("SpeakerArray", "person", person, "")] + \
-           [("ProjectionCalibration", m, v, "") for m, v in projection]
+           [("Projector", m, v, "") for m, v in projection]
     record = judge.judge(FIXTURES / "GREEN-DOME-1.yml", _raw(tmp_path, rows), THRESHOLDS, "GREEN-DOME-1", "abc")
     return {d["device"]: d["why"] for d in record["devices"] if not d["ok"]}
 
@@ -128,7 +128,7 @@ PROJECTED = [("frames", "300"), ("seconds", "5"), ("person", "1")]
 
 def test_a_section_a_person_confirms(tmp_path):
     assert _dome(tmp_path, [("frames", "300"), ("seconds", "5"), ("person", "0")]) == \
-        {"ProjectionCalibration": "not confirmed by the person"}
+        {"Projector": "not confirmed by the person"}
     assert _dome(tmp_path, PROJECTED) == {}
 
 
@@ -152,14 +152,14 @@ def test_speakers_the_mixer_was_sent_no_test_sound_fail_whatever_the_person_says
 
 def test_a_slow_projector_fails_whatever_the_person_says(tmp_path):
     assert _dome(tmp_path, [("frames", "50"), ("seconds", "5"), ("person", "1")]) == \
-        {"ProjectionCalibration": "10.0 frames/s drawn, 55 needed"}
+        {"Projector": "10.0 frames/s drawn, 55 needed"}
 
 
 def test_the_record_is_dated_by_the_raw_file(tmp_path):
     import os
     from datetime import datetime, timezone
 
-    raw = _raw(tmp_path, GOOD_BOX)
+    raw = _raw(tmp_path, GOOD_BBOX)
     then = datetime(2026, 11, 6, 9, 0, tzinfo=timezone.utc).timestamp()
     os.utime(raw, (then, then))
     record = judge.judge(FIXTURES / "BBOX-1.yml", raw, THRESHOLDS, "BBOX-1", "abc")

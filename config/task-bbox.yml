@@ -1,0 +1,4 @@
+# The behaviour boxes' preflight (src\bbox.bonsai): app-rig-control launches it, with this file, on a machine whose
+# profile is rig-bbox (calibrations.toml [[preflight.by_profile]]), and writes it at Go; OpenRigs.Devices PreflightChecks reads it (ReadPreflightTask).
+countSeconds: 5  # each device counted this long after Go
+questions: {}    # nothing a person must confirm on a box yet

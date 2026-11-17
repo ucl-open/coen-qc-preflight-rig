@@ -48,5 +48,5 @@ jobs:
       - name: Each workflow parses
         shell: pwsh
         run: |
-          uv run --no-project python -c "import xml.etree.ElementTree as ET; [print(ET.parse(f) and f, 'parses') for f in ('src/dome.bonsai', 'src/box.bonsai')]"
+          uv run --no-project python -c "import xml.etree.ElementTree as ET; [print(ET.parse(f) and f, 'parses') for f in ('src/dome.bonsai', 'src/bbox.bonsai')]"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }

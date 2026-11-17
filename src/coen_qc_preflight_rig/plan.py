@@ -12,7 +12,7 @@ _FIELDS = {
     "licketySplit": "lickety_split",
     "camera": "camera",
     "speakerArray": "speaker_array",
-    "projectionCalibration": "projection_calibration",
+    "projector": "projector",
 }
 
 

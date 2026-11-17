@@ -89,8 +89,8 @@ def device_verdict(device: Planned, measures: dict | None, limits: dict, rig: La
 
 
 def check_commit(clone: Path) -> str:
-    """The last commit that changed the check (src, config), never its packages: what rig-control's gate
-    compares, so the lab's package bumps leave a pass standing (audit, 7 Nov 2026); "" without git."""
+    """The last commit that changed the check (src, config), never its packages: what app-rig-control's gate
+    compares, so the lab's package bumps leave a pass standing; "" without git."""
     try:
         done = subprocess.run(["git", "-C", str(clone), "log", "-1", "--format=%H", "--", "src", "config"],
                               capture_output=True, text=True, timeout=20)
@@ -100,8 +100,8 @@ def check_commit(clone: Path) -> str:
 
 
 def judge(rig_yml: Path, raw: Path, thresholds: Path, rig_name: str, commit: str) -> dict:
-    """The pass record: what the rig-control gate reads. Dated by the raw file, when it was measured, so a
-    file left from an earlier run is never a fresh pass (audit, 7 Nov 2026)."""
+    """The pass record: what the app-rig-control gate reads. Dated by the raw file, when it was measured, so a
+    file left from an earlier run is never a fresh pass."""
     rig = load(rig_yml)
     limits = yaml.safe_load(Path(thresholds).read_text(encoding="utf-8")) or {}
     rows = read_raw(raw)

@@ -2,7 +2,7 @@
 
 lib-open-rigs' `open_rigs.rigs.lab_rig.LabRig` (in Bonsai, `OpenRigs.Devices:ReadLabRig.bonsai`): each device
 kind is a group of named entries and defaults to none, each single section is optional, so a dome's file and a
-box's both load; a key the model lacks is refused, as every workflow refuses it at Start.
+bbox's both load; a key the model lacks is refused, as every workflow refuses it at Start.
 """
 
 from pathlib import Path
