@@ -80,6 +80,8 @@ def test_each_speaker_s_test_sound_is_counted_into_the_check():
     assert fed == {"Source1": "MixerStimulusSounds", "Source2": "RigConfigs"}
     assert [nodes[b].findtext(W + "Name") for a, b, _ in edges if a == count] == ["SpeakerSounds"]
     text = ET.tostring(group, encoding="unicode")
+    # -30 dBFS RMS is measured outside the silent half (lib SoundLevel rule, Nov 2026): the tone plays 3.01 dB
+    # quieter than under the old whole-buffer RMS (Pip accepted), so the workflow value stays -30.
     assert text.count(":SpeakerBuffer") == 1 and "LevelDbfs>-30<" in text
     assert 'Prompt.StartsWith("SpeakerArray:")' in text and "Name>Confirms</" in text
 
