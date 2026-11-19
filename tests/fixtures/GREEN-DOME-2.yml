@@ -76,13 +76,9 @@ licketySplit:
   left:
     portName: COM11
     usbSerial: E664C856C3592237
-    channel0TriggerThreshold: 0     # ADC counts above which a lick registers
-    channel0UntriggerThreshold: 0   # ADC counts below which the lick ends
   right:
     portName: COM12
     usbSerial: E664C856C30B7F22
-    channel0TriggerThreshold: 0
-    channel0UntriggerThreshold: 0
 
 # From RigConfigs.cs, whose GreenDome1configs carries the same three (GREEN-DOME-1's own rig.yml has
 # others): check them against the cameras on this rig.

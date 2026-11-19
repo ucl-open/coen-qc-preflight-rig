@@ -71,13 +71,9 @@ licketySplit:
   left:
     portName: COM15
     usbSerial: E664C856C3769D22
-    channel0TriggerThreshold: 0     # ADC counts above which a lick registers
-    channel0UntriggerThreshold: 0   # ADC counts below which the lick ends
   right:
     portName: COM13
     usbSerial: E664C856C3658322
-    channel0TriggerThreshold: 0
-    channel0UntriggerThreshold: 0
 
 camera:
   face:
