@@ -20,7 +20,7 @@ coen-qc-preflight-rig = "coen_qc_preflight_rig.cli:main"
 dev = ["pytest"]
 
 [tool.uv.sources]
-open-rigs = {git = "https://github.com/Coen-Lab/lib-open-rigs", rev = "827793e485651e3e3118aa0cf444768a97bb3d0e"}
+open-rigs = {git = "https://github.com/Coen-Lab/lib-open-rigs", rev = "d798b2a0d29ec626cac2b0042a1bf2bef6424f1b"}
 
 [tool.ruff]
 line-length = 120
