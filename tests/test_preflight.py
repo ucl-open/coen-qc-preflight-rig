@@ -170,7 +170,30 @@ def test_check_commit_is_the_last_change_to_src_or_config():
     repo = Path(__file__).parents[1]
     import subprocess
 
-    want = subprocess.run(["git", "-C", str(repo), "log", "-1", "--format=%H", "--", "src", "config"],
-                          capture_output=True, text=True).stdout.strip()
+    want = subprocess.run(["git", "-C", str(repo), "log", "-1", "--format=%H", "--", "src", "config",
+                           ":(exclude)src/Extensions.csproj"], capture_output=True, text=True).stdout.strip()
     assert want and judge.check_commit(repo) == want
     assert judge.check_commit(repo / "no-such-folder") == ""
+
+
+def test_check_commit_ignores_a_csproj_bump(tmp_path):
+    """P3Q-M1: the lab's package bumps rewrite only src/Extensions.csproj, and leave a pass standing."""
+    import os
+    import subprocess
+
+    env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
+           "GIT_COMMITTER_EMAIL": "t@t", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull}
+
+    def git(*args):
+        subprocess.run(["git", "-C", str(tmp_path), *args], check=True, capture_output=True, env=env)
+
+    git("init", "-q")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "main.bonsai").write_text("a")
+    git("add", ".")
+    git("commit", "-qm", "check")
+    made = judge.check_commit(tmp_path)
+    (tmp_path / "src" / "Extensions.csproj").write_text("packages")
+    git("add", ".")
+    git("commit", "-qm", "packages")
+    assert made and judge.check_commit(tmp_path) == made

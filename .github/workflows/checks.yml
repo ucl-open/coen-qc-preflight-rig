@@ -1,8 +1,7 @@
-# The checks run before a push (README), on every push to main, as far as CI can run them: the Python tests, Bonsai
-# set up as a rig sets it up (.bonsai\Setup.ps1: Bonsai and every package restored), src\Extensions compiled under
-# C# 5 (the language Bonsai compiles it with) and each workflow parsed. The full build check (each built with
-# Bonsai's builders, its ExperimentControl names) is app-rig-setup's workflows\check-workflow-builds.ps1,
-# in a private repository: run it before pushing.
+# The checks run before a push (README), on every push to main: the Python tests, then Bonsai set up as a rig sets it
+# up (.bonsai\Setup.ps1) and the lab's workflow check on each workflow (scripts\check-workflow.ps1: the Extensions under
+# C# 5, their tests, each workflow built with Bonsai's builders against the lab's rig template, the task files read as at
+# Go).
 
 name: Checks
 
@@ -38,15 +37,8 @@ jobs:
         run: |
           powershell -NoProfile -ExecutionPolicy Bypass -File .bonsai/Setup.ps1
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-      - name: Extensions under C# 5
-        if: hashFiles('src/Extensions.csproj') != ''
+      - name: Workflow check
         shell: pwsh
         run: |
-          # The lab's packages come from local_packages, as Setup.ps1 restores them (.bonsai\NuGet.config).
-          dotnet build src/Extensions.csproj -p:LangVersion=5 -o "$env:RUNNER_TEMP/extensions" --source https://api.nuget.org/v3/index.json --source "$PWD/local_packages"
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-      - name: Each workflow parses
-        shell: pwsh
-        run: |
-          uv run --no-project python -c "import xml.etree.ElementTree as ET; [print(ET.parse(f) and f, 'parses') for f in ('src/dome.bonsai', 'src/bbox.bonsai')]"
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-workflow.ps1
           if ($LASTEXITCODE) { exit $LASTEXITCODE }

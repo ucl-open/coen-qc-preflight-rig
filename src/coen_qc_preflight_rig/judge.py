@@ -89,10 +89,11 @@ def device_verdict(device: Planned, measures: dict | None, limits: dict, rig: La
 
 
 def check_commit(clone: Path) -> str:
-    """The last commit that changed the check (src, config), never its packages: what app-rig-control's gate
-    compares, so the lab's package bumps leave a pass standing; "" without git."""
+    """The last commit that changed the check (src, config), never its packages (src/Extensions.csproj): what
+    app-rig-control's gate compares, so the lab's package bumps leave a pass standing; "" without git."""
     try:
-        done = subprocess.run(["git", "-C", str(clone), "log", "-1", "--format=%H", "--", "src", "config"],
+        done = subprocess.run(["git", "-C", str(clone), "log", "-1", "--format=%H", "--", "src", "config",
+                               ":(exclude)src/Extensions.csproj"],
                               capture_output=True, text=True, timeout=20)
     except (OSError, subprocess.TimeoutExpired):
         return ""
