@@ -25,3 +25,13 @@ History is in `git log`.
 
 - task-dome.yml and task-bbox.yml as Preflight configs: they use the task-file mechanism.
 - SpeakerArray as a Preflight row: it matches its rig.yml key.
+
+## Audit 2026-11-22 (/audit-rigs, pipeline)
+
+Changed (9826ffa): `check_commit` leaves out `src/Extensions.csproj`, so a package bump keeps a pass standing, as app-rig-control's `preflight.check_commit` (P3Q-M1); CI runs `scripts\check-workflow.ps1` in place of the C# 5 and parse steps (P6S-L1).
+
+Deferred: a manual Checks run of the new step.
+
+Not changed, do not raise again without new information:
+
+- None in this repo this round.
