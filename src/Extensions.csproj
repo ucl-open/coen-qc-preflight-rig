@@ -8,8 +8,8 @@
   <ItemGroup>
     <PackageReference Include="Bonsai.Core" Version="2.9.0" />
     <PackageReference Include="OpenCV.Net" Version="3.4.2" />
-    <PackageReference Include="OpenRigs.Control" Version="0.1.1-coen-lab.20" />
-    <PackageReference Include="OpenRigs.Devices" Version="0.1.1-coen-lab.54" />
+    <PackageReference Include="OpenRigs.Control" Version="0.1.1-coen-lab.21" />
+    <PackageReference Include="OpenRigs.Devices" Version="0.1.1-coen-lab.55" />
   </ItemGroup>
 
 </Project>
