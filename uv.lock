@@ -41,7 +41,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "open-rigs", git = "https://github.com/Coen-Lab/lib-open-rigs?rev=7c7c0c37499cf9054d6156830e5d9cfb02445dbe" },
+    { name = "open-rigs", git = "https://github.com/Coen-Lab/lib-open-rigs?rev=a820afb10fc81799b9b9e133d940931c94fa5651" },
     { name = "pyyaml" },
 ]
 
@@ -255,7 +255,7 @@ wheels = [
 [[package]]
 name = "open-rigs"
 version = "0.0.0"
-source = { git = "https://github.com/Coen-Lab/lib-open-rigs?rev=7c7c0c37499cf9054d6156830e5d9cfb02445dbe#7c7c0c37499cf9054d6156830e5d9cfb02445dbe" }
+source = { git = "https://github.com/Coen-Lab/lib-open-rigs?rev=a820afb10fc81799b9b9e133d940931c94fa5651#a820afb10fc81799b9b9e133d940931c94fa5651" }
 dependencies = [
     { name = "jsonschema" },
     { name = "pydantic" },
