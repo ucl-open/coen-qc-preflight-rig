@@ -6,7 +6,7 @@ build-backend = "uv_build"
 name = "coen-qc-preflight-rig"
 description = "The pre-training preflight: one workflow for each rig kind, checking every device the rig's rig.yml declares."
 license = "MIT"
-requires-python = ">=3.11, <3.12"
+requires-python = ">=3.13, <3.14"
 version = "0.1.0"
 dependencies = [
   "open-rigs",
@@ -24,4 +24,4 @@ open-rigs = {git = "https://github.com/Coen-Lab/lib-open-rigs", rev = "7ed43fd91
 
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py313"
