@@ -10,7 +10,7 @@
   <Workflow>
     <Nodes>
       <Expression xsi:type="ExternalizedMapping">
-        <Property Name="ConfigRoot" Description="The folder holding &lt;RIG&gt;\rig.yml, read by ReadLabRig; a launch property. LiveView keeps its own ConfigRoot: an edge into it makes Bonsai build it before the pieces, and it then streams nothing." />
+        <Property Name="ConfigRoot" Description="The folder holding &lt;RIG&gt;\rig.yml, read by ReadLabRig; a launch property. LiveView takes it from ReadLabRig." />
       </Expression>
       <Expression xsi:type="IncludeWorkflow" Path="OpenRigs.Devices:ReadLabRig.bonsai">
         <Description>This machine's rig.yml (ConfigRoot\&lt;RIG&gt;\rig.yml) read once into the lab rig model: RigConfigs, RigFile and ConfigRoot, which every device piece reads. First, before anything that reads them.</Description>
@@ -79,7 +79,6 @@
       <Expression xsi:type="lv:StreamDevices">
         <Name>LiveView</Name>
         <Description>Streams every rig.yml device the pieces publish (their &lt;Device&gt;.Data) to app-rig-control's live view (OpenRigs.LiveView): data on TCP 5556, video on 5558. No experiment folder, so the session key stays ready. Last in the workflow: it finds only subjects built before it.</Description>
-        <lv:ConfigRoot>C:\Coen-Lab-Local\RigConfigs</lv:ConfigRoot>
         <lv:DataPort>5556</lv:DataPort>
         <lv:VideoPort>5558</lv:VideoPort>
       </Expression>
