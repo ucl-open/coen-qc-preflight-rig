@@ -18,21 +18,20 @@ behaviorBoard:
     portName: COM6
     usbSerial: BG01WA0E
     pulseController:
-      outputPulseEnable: "DO1, DO2"   # never DO3: the ZapitTrigger line is held until the workflow clears it
+      outputPulseEnable: "DO1, DO2"
       # Each line is a FixedPulse (width set here) or a CalibratedPulse (width looked up per reward
       # on a valve calibration curve in calibration\). A fixed reward line delivers ceil(ul / 2)
       # pulses of its width, assuming 2 ul per pulse; a calibrated one delivers the requested volume.
       outputs:
         DO1: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Left.json }   # left reward valve
         DO2: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Right.json }   # right reward valve
-        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }   # ZapitTrigger line: held, not pulsed, so no width
-    # What each line drives (lab rig model): one RewardValve per spout, named left and right, and the ZapitTrigger.
+        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }   # unused
+    # What each line drives (lab rig model): one RewardValve per spout, named left and right. No Zapit on this rig.
     wiring:
       DIPort0: { device: Photodiode }
       DO0: { device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }
       DO1: { device: RewardValve, name: left }
       DO2: { device: RewardValve, name: right }
-      DO3: { device: ZapitTrigger }
     cameraTriggerController:
       trigger0Enabled: true     # camera trigger 0 shares the DO0 pin
       trigger0Frequency: 50     # Hz
@@ -168,12 +167,6 @@ speakerArray:
   #   layer4_-90:    { position: { azimuth: -90,    elevation: -15 }, channel: 24 }
   #   layer4_-120:   { position: { azimuth: -120,   elevation: -15 }, channel: 25 }
 
-# Zapit optogenetics server (tcpServer section of the Zapit settings file). Contacted only when the
-# task has optogenetics on, so a rig without it can leave the defaults.
-zapit:
-  host: 127.0.0.1         # PC running Zapit; 127.0.0.1 when Zapit runs on this rig PC
-  port: 1488
-  hardwareTriggered: false  # true once wiring's ZapitTrigger line is cabled to the Zapit DAQ trigger input
 # Default absolute stage position at session start (steps)
 lickSpoutDefaultPosition:   # mean of the two-spout mice on this rig
   baseTransverse: 6150

@@ -14,18 +14,17 @@ behaviorBoard:
     portName: COM10
     usbSerial: BG01WA06
     pulseController:
-      outputPulseEnable: "DO1, DO2"   # never DO3: the ZapitTrigger line is held until the workflow clears it
+      outputPulseEnable: "DO1, DO2"
       outputs:
         DO1: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Left.json }   # left reward valve
         DO2: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Right.json }   # right reward valve
-        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }   # ZapitTrigger line: held, not pulsed, so no width
-    # What each line drives (lab rig model): one RewardValve per spout, named left and right, and the ZapitTrigger.
+        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }   # unused
+    # What each line drives (lab rig model): one RewardValve per spout, named left and right. No Zapit on this rig.
     wiring:
       DIPort0: { device: Photodiode }
       DO0: { device: CameraTrigger, targets: [Camera-Face, Camera-Pupil, Camera-Body] }
       DO1: { device: RewardValve, name: left }
       DO2: { device: RewardValve, name: right }
-      DO3: { device: ZapitTrigger, note: also the masking light }
     cameraTriggerController:
       trigger0Enabled: true     # camera trigger 0 shares the DO0 pin
       trigger0Frequency: 50     # Hz
@@ -135,11 +134,6 @@ speakerArray:
       channel: 2
       filter: calibration/speaker-centre.json
 
-# Zapit is not hardware triggered: the trigger is the board's ZapitTrigger line in wiring.
-zapit:
-  host: 127.0.0.1
-  port: 1488
-  hardwareTriggered: false   # the trigger is the board's ZapitTrigger line in wiring
 
 # Default absolute stage position at session start (steps)
 lickSpoutDefaultPosition:
