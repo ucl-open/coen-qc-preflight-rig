@@ -9,11 +9,11 @@ behaviorBoard:
     portName: COM11
     usbSerial: BG00O1OC
     pulseController:
-      outputPulseEnable: "DO1, DO2"   # never DO3: the ZapitTrigger line is held until the workflow clears it
+      outputPulseEnable: "DO1, DO2, DO3"   # DO3, the ZapitTrigger line: the board ends it after its width if Bonsai dies
       outputs:
         DO1: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Left.json }
         DO2: { discriminatorType: CalibratedPulse, artefact: calibration/RewardValve-Right.json }
-        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 0 }   # ZapitTrigger line: held, not pulsed, so no width
+        DO3: { discriminatorType: FixedPulse, pulseWidthMs: 10000 }   # ZapitTrigger line: held until the workflow clears it, at most this long
     # What each line drives: one RewardValve per spout, named left and right, and one ZapitTrigger (lab rig model).
     wiring:
       DIPort0: { device: Photodiode }
